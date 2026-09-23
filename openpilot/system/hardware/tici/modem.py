@@ -179,6 +179,8 @@ class Modem:
     self._apn = ""  # blank = network-provided via PCO
     self._roaming_allowed = True
     self._last_iccid_check = 0.0
+    self._user_apn = ""
+    self._recovery_timer = 0.0
     self.running = True
     self.S = INITIAL_STATE.copy()
 
@@ -296,11 +298,31 @@ class Modem:
       logging.warning(f"identity read incomplete: {identity}, retrying")
       return State.INITIALIZING
 
+    self._user_apn = self._read_param("GsmApn")
+
+    # If user configured a custom carrier APN but internal fallback eSIM was read, attempt to recover physical SIM
+    if self._user_apn and identity["iccid"].startswith(WEBBING_ICCID_PREFIX):
+      logging.warning("User APN configured, but internal fallback eSIM detected. Probing physical SIM...")
+      for attempt in range(2):
+        self._probe_physical_sim()
+        new_id = self._read_identity()
+        if not new_id["iccid"].startswith(WEBBING_ICCID_PREFIX) and new_id["iccid"]:
+          logging.info(f"Physical SIM successfully detected: {new_id['iccid']}")
+          identity = new_id
+          break
+        time.sleep(1.0)
+
     self._configure_modem(identity["modem_version"])
 
     self.S.update(identity)
-    self._apn = self._read_param("GsmApn")
     self._roaming_allowed = self._is_roaming_allowed()
+
+    # Guard: never inject domestic APN into Webbing eSIM to prevent network reject
+    if identity["iccid"].startswith(WEBBING_ICCID_PREFIX):
+      self._apn = ""
+    else:
+      self._apn = self._user_apn
+
     # blank APN lets the carrier supply one via PCO
     self._at(f'AT+CGDCONT={DIAL_CID},"IP","{self._apn}"')
     logging.info(f"APN '{self._apn or '(network-provided)'}' written to CID {DIAL_CID}, roaming={'on' if self._roaming_allowed else 'off'}")
@@ -333,6 +355,17 @@ class Modem:
     logging.info(f"imei={imei} iccid={iccid} mcc_mnc={mcc_mnc} sim_state={sim_state} ver={modem_version}")
     return {"imei": imei, "iccid": iccid, "mcc_mnc": mcc_mnc, "modem_version": modem_version, "sim_state": sim_state}
 
+  def _probe_physical_sim(self):
+    """Probe physical SIM slot and cycle baseband radio to clear FPLMN and re-detect SIM."""
+    logging.warning("Probing physical SIM slot & cycling radio...")
+    self._at("AT+QUIMSLOT=2")
+    self._at("AT+COPS=2")
+    self._at("AT+CFUN=0")
+    time.sleep(1.0)
+    self._at("AT+CFUN=1")
+    time.sleep(2.0)
+    self._at("AT+COPS=0")
+
   def _do_searching(self):
     if self.S["sim_state"] == "ABSENT":
       return self._searching_idle()
@@ -350,11 +383,27 @@ class Modem:
     greg = self._parse_reg(self._atv("AT+CGREG?", "+CGREG:") or "")
     logging.debug(f"creg={reg} cgreg={greg} roaming_allowed={self._roaming_allowed}")
 
+    # Watchdog: recover if registration is denied or stuck on fallback eSIM when user APN is configured
+    is_fallback_esim = self.S.get("iccid", "").startswith(WEBBING_ICCID_PREFIX) and bool(self._user_apn)
+    now = time.monotonic()
+    if reg == "denied" or greg == "denied" or is_fallback_esim:
+      if self._recovery_timer == 0.0:
+        self._recovery_timer = now
+      elif now - self._recovery_timer > 20.0:
+        cause = "denied" if (reg == "denied" or greg == "denied") else "fallback eSIM"
+        logging.warning(f"Registration stuck ({cause}) for >20s, recovering physical SIM & cycling radio...")
+        self._recovery_timer = 0.0
+        self._probe_physical_sim()
+        return State.DISCONNECTING
+    else:
+      self._recovery_timer = 0.0
+
     if reg == "roaming" and not self._roaming_allowed:
       self._publish_state(registration=reg)
       return State.SEARCHING
 
     if reg in ("home", "roaming") and greg in ("home", "roaming"):
+      self._recovery_timer = 0.0
       self._publish_state(registration=reg)
       return State.CONNECTING
 
@@ -391,8 +440,8 @@ class Modem:
 
   def _params_changed(self) -> bool:
     new_apn = self._read_param("GsmApn")
-    if new_apn != self._apn:
-      logging.info(f"GsmApn changed: '{self._apn}' -> '{new_apn}'")
+    if new_apn != self._user_apn:
+      logging.info(f"GsmApn changed: '{self._user_apn}' -> '{new_apn}'")
       return True
     new_roaming = self._is_roaming_allowed()
     if new_roaming != self._roaming_allowed:
