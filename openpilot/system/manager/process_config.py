@@ -125,6 +125,16 @@ def enable_youtube_wide_encoder(started, params, CP: car.CarParams) -> bool:
 def enable_cluster_hud(started, params, CP: car.CarParams) -> bool:
   return cluster_hud_active(params)
 
+def enable_carrot_ha(started: bool, params: Params, CP: car.CarParams) -> bool:
+  try:
+    return (
+      params.get_bool("CarrotHaEnabled")
+      or os.path.exists("/data/id4-collector/connection.json")
+      or os.path.exists("/data/carrot_ha/connection.json")
+    )
+  except Exception:
+    return False
+
 procs = [
   DaemonProcess("manage_athenad", "openpilot.system.athena.manage_athenad", "AthenadPid"),
 
@@ -199,6 +209,7 @@ procs = [
   PythonProcess("carrot_server", "openpilot.selfdrive.carrot.carrot_server", always_run, enabled=not CARROT_WEB_EXTERNAL),
   PythonProcess("carrot_bluetooth", "openpilot.selfdrive.carrot.bluetooth.daemon", always_run, enabled=TICI, restart_if_crash=True),
   PythonProcess("cweb_push", "openpilot.selfdrive.carrot.cweb_push", always_run, enabled=not PC),
+  PythonProcess("carrot_ha", "openpilot.selfdrive.carrot.ha.daemon", always_run, enabled=enable_carrot_ha, restart_if_crash=True),
   PythonProcess("carrot_cluster", "openpilot.selfdrive.carrot.cluster_autorun", enable_cluster_hud, restart_if_crash=True),
 
   #Xiaoge data broadcaster (conditional on ShareData param)

@@ -1,0 +1,32 @@
+name: Auto Sync Upstream Model Selector
+
+on:
+  schedule:
+    # Run every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout custom branch
+        uses: actions/checkout@v4
+        with:
+          ref: carrot-wip-model_selector-ha
+          fetch-depth: 0
+
+      - name: Configure Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch and Merge Upstream
+        run: |
+          git remote add upstream https://github.com/ajouatom/openpilot.git || true
+          git fetch upstream happymaj11r/carrot-wip-model_selector
+          git merge upstream/happymaj11r/carrot-wip-model_selector --no-edit -m "chore: auto-sync upstream happymaj11r/carrot-wip-model_selector"
+          git push origin carrot-wip-model_selector-ha
