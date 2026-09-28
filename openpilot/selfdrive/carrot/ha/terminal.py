@@ -4,7 +4,8 @@ from __future__ import annotations
 import asyncio
 from contextlib import suppress
 import json
-from urllib.parse import quote, urlsplit, urlunsplit
+import time
+from urllib.parse import quote, urlencode, urlsplit, urlunsplit
 import uuid
 
 
@@ -228,6 +229,44 @@ class TerminalAgent:
       await self.stop_local()
 
 
+async def discover(client, config):
+  """Use the existing upload identity; never write connection.json."""
+  address = config.get('url', '')
+  url = urlsplit(address)
+  if url.scheme != 'https' or not url.hostname or url.username or url.password or url.query or url.fragment or url.path not in ('', '/'):
+    raise ValueError('invalid Worker URL')
+  async with client.get(
+    address.rstrip('/') + '/api/terminal/bootstrap?' + urlencode({'device_id': config['device']}),
+    headers={'Authorization': 'Bearer ' + config['token']}, allow_redirects=False,
+  ) as response:
+    if response.status == 404:
+      return None  # Older Workers are supported while rollout is in progress.
+    response.raise_for_status()
+    payload = await response.json()
+  value = payload.get('config')
+  if payload.get('protocol') != PROTOCOL or not isinstance(value, dict):
+    return None
+  expiry = value.get('expires_at')
+  if not isinstance(expiry, (int, float)) or not time.time() * 1000 < expiry <= time.time() * 1000 + 240000:
+    return None
+  result = {**value, 'device': config['device']}
+  validate_config(result)
+  return result
+
+
+async def watch_discovery(client, original, remote, resolved):
+  while True:
+    await asyncio.sleep(15)
+    try:
+      latest = await discover(client, original)
+      valid = latest and all(latest.get(key) == resolved.get(key) for key in ('ha_url', 'terminal_token'))
+    except Exception:
+      valid = False
+    if not valid:
+      await remote.close()
+      return
+
+
 async def run() -> None:
   import aiohttp
   from openpilot.selfdrive.carrot.ha.collector import load_config
@@ -236,30 +275,34 @@ async def run() -> None:
   delay = 2
   while True:
     config = load_config()
-    if not config or config.get("terminal_enabled") is not True:
-      await asyncio.sleep(30)
-      continue
-    try:
-      url = validate_config(config)
-    except ValueError as exc:
-      print(f"[Carrot HA terminal] configuration disabled: {exc}", flush=True)
+    if not config:
       await asyncio.sleep(30)
       continue
     try:
       timeout = aiohttp.ClientTimeout(total=20)
       async with aiohttp.ClientSession(timeout=timeout) as client:
+        resolved = await discover(client, config)
+        if not resolved:
+          await asyncio.sleep(30)
+          continue
+        url = validate_config(resolved)
         async with client.ws_connect(
           url,
-          headers={"Authorization": "Bearer " + config["terminal_token"]},
+          headers={"Authorization": "Bearer " + resolved["terminal_token"]},
           heartbeat=10,
           max_msg_size=MAX_REMOTE_BYTES,
           compress=0,
         ) as remote:
           print("[Carrot HA terminal] connected; waiting for an HA administrator", flush=True)
           delay = 2
-          await agent.connection(remote)
+          watcher = asyncio.create_task(watch_discovery(client, config, remote, resolved))
+          try:
+            await agent.connection(remote)
+          finally:
+            watcher.cancel()
+            await asyncio.gather(watcher, return_exceptions=True)
     except (aiohttp.ClientError, OSError, ValueError, RuntimeError, TimeoutError) as exc:
-      print(f"[Carrot HA terminal] connection unavailable: {type(exc).__name__}: {exc}", flush=True)
+      print(f"[Carrot HA terminal] connection unavailable: {type(exc).__name__}", flush=True)
     await asyncio.sleep(delay)
     delay = min(delay * 2, 60)
 

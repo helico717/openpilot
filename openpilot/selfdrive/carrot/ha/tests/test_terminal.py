@@ -3,8 +3,56 @@ from __future__ import annotations
 import unittest
 from unittest.mock import AsyncMock
 import uuid
+import time
+from unittest.mock import patch
 
 from openpilot.selfdrive.carrot.ha.terminal import LOCAL_WS_URL, TerminalAgent, validate_config
+from openpilot.selfdrive.carrot.ha.terminal import discover, watch_discovery
+
+
+class Response:
+  status = 200
+
+  def __init__(self, payload):
+    self.payload = payload
+
+  async def __aenter__(self):
+    return self
+
+  async def __aexit__(self, *args):
+    pass
+
+  def raise_for_status(self):
+    pass
+
+  async def json(self):
+    return self.payload
+
+
+class DiscoveryTest(unittest.IsolatedAsyncioTestCase):
+  async def test_existing_config_is_sufficient_and_not_modified(self):
+    original = {'url': 'https://worker.example', 'token': 'existing-upload', 'device': 'comma'}
+    before = dict(original)
+    resolved = {'ha_url': 'https://ha.example', 'terminal_token': 't' * 64, 'expires_at': time.time() * 1000 + 120000}
+    from unittest.mock import Mock
+    client = Mock()
+    client.get.return_value = Response({'protocol': 1, 'config': resolved})
+    result = await discover(client, original)
+    self.assertEqual(result['device'], 'comma')
+    self.assertEqual(original, before)
+    self.assertEqual(client.get.call_args.kwargs['headers'], {'Authorization': 'Bearer existing-upload'})
+    self.assertFalse(client.get.call_args.kwargs['allow_redirects'])
+    resolved['expires_at'] = 1
+    self.assertIsNone(await discover(client, original))
+    client.get.return_value.status = 404
+    self.assertIsNone(await discover(client, original))
+
+  async def test_revocation_closes_connection(self):
+    remote = AsyncMock()
+    module = 'openpilot.selfdrive.carrot.ha.terminal'
+    with patch(module + '.asyncio.sleep', new=AsyncMock()), patch(module + '.discover', new=AsyncMock(return_value=None)):
+      await watch_discovery(None, {}, remote, {})
+    remote.close.assert_awaited_once()
 
 
 class TerminalConfigTest(unittest.TestCase):
