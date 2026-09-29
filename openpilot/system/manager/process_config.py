@@ -135,6 +135,11 @@ def enable_carrot_ha(started: bool, params: Params, CP: car.CarParams) -> bool:
   except Exception:
     return False
 
+def enable_carrot_camera(started: bool, params: Params, CP: car.CarParams) -> bool:
+  from openpilot.selfdrive.carrot.ha.camera.service import configured
+  return configured()
+
+
 procs = [
   DaemonProcess("manage_athenad", "openpilot.system.athena.manage_athenad", "AthenadPid"),
 
@@ -209,6 +214,7 @@ procs = [
   PythonProcess("carrot_server", "openpilot.selfdrive.carrot.carrot_server", always_run, enabled=not CARROT_WEB_EXTERNAL),
   PythonProcess("carrot_bluetooth", "openpilot.selfdrive.carrot.bluetooth.daemon", always_run, enabled=TICI, restart_if_crash=True),
   PythonProcess("cweb_push", "openpilot.selfdrive.carrot.cweb_push", always_run, enabled=not PC),
+  PythonProcess("carrot_camera", "openpilot.selfdrive.carrot.ha.camera.service", enable_carrot_camera, restart_if_crash=True),
   PythonProcess("carrot_ha", "openpilot.selfdrive.carrot.ha.daemon", always_run, enabled=enable_carrot_ha, restart_if_crash=True),
   PythonProcess("carrot_cluster", "openpilot.selfdrive.carrot.cluster_autorun", enable_cluster_hud, restart_if_crash=True),
 
