@@ -87,6 +87,7 @@ def run(session_id):
                 cwd=binary.parent, env=environment, stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True))
         seen = {}
+        common_origin_ns = None
         while not lease['stopped'] and time.monotonic() - started < 300:
             require_offroad(params)
             now = time.monotonic()
@@ -100,7 +101,10 @@ def run(session_id):
                     continue
                 camera = names[event.which()]
                 packet = getattr(event, event.which())
-                payload = muxes[camera].push(bytes(packet.header), bytes(packet.data), int(packet.idx.timestampSof))
+                sof_ns = int(packet.idx.timestampSof)
+                if common_origin_ns is None and packet.header:
+                    common_origin_ns = sof_ns
+                payload = muxes[camera].push(bytes(packet.header), bytes(packet.data), sof_ns, origin_ns=common_origin_ns)
                 if payload:
                     seen[camera] = now
                 for offset in range(0, len(payload), MAX_PAYLOAD):

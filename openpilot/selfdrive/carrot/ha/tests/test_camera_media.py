@@ -82,3 +82,22 @@ class MuxTests(unittest.TestCase):
                 if started:
                     decoded.extend(packet.decode())
         self.assertEqual(len(decoded), 10)
+
+    def test_synchronized_multi_camera_origin_preserves_relative_timing(self):
+        common_origin = 1_000_000_000
+        mux1 = media.TransportMux()
+        mux2 = media.TransportMux()
+        frames1 = list(encoded_frames())
+        frames2 = list(encoded_frames())
+        # Stream 1 starts at T0 (1_000_000_000)
+        h1, d1, _ = frames1[0]
+        mux1.push(h1, d1, common_origin, origin_ns=common_origin)
+        # Stream 2 starts 200ms later at T0 + 200ms (1_200_000_000)
+        h2, d2, _ = frames2[0]
+        mux2.push(h2, d2, common_origin + 200_000_000, origin_ns=common_origin)
+        # Mux 1 PTS at T0 should be 0
+        self.assertEqual(mux1.last_pts, 0)
+        # Mux 2 PTS at T0+200ms should be 200ms * 90000 / 1e9 = 18000 (not reset to 0!)
+        self.assertEqual(mux2.last_pts, 18000)
+        mux1.close()
+        mux2.close()

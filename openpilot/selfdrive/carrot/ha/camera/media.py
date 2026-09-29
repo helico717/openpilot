@@ -23,14 +23,14 @@ class Buffer:
 
 
 class TransportMux:
-    def __init__(self):
+    def __init__(self, origin_ns=None):
         self.buffer = Buffer()
         self.container = None
         self.stream = None
-        self.origin_ns = None
+        self.origin_ns = origin_ns
         self.last_pts = -1
 
-    def push(self, header, data, timestamp_ns):
+    def push(self, header, data, timestamp_ns, origin_ns=None):
         if self.container is None:
             if not header:
                 return b''  # Wait for SPS/PPS + keyframe.
@@ -39,8 +39,10 @@ class TransportMux:
                     'mpegts_flags': 'resend_headers', 'flush_packets': '1'})
                 self.stream = self.container.add_stream_from_template(source.streams.video[0])
                 self.stream.time_base = Fraction(1, 90000)
-            self.origin_ns = timestamp_ns
-        pts = (timestamp_ns - self.origin_ns) * 90000 // 1_000_000_000
+            if self.origin_ns is None:
+                self.origin_ns = origin_ns if origin_ns is not None else timestamp_ns
+        origin = self.origin_ns if origin_ns is None else origin_ns
+        pts = (timestamp_ns - origin) * 90000 // 1_000_000_000
         if pts <= self.last_pts:
             raise ValueError('Non-monotonic camera timestamp')
         self.last_pts = pts
