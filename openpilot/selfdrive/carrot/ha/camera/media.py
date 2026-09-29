@@ -43,7 +43,12 @@ class TransportMux:
                 self.origin_ns = origin_ns if origin_ns is not None else timestamp_ns
         origin = self.origin_ns if origin_ns is None else origin_ns
         pts = (timestamp_ns - origin) * 90000 // 1_000_000_000
-        if pts <= self.last_pts:
+        if pts < 0:
+            if self.last_pts < 0:
+                pts = 0
+            else:
+                pts = self.last_pts + 1
+        elif pts <= self.last_pts:
             raise ValueError('Non-monotonic camera timestamp')
         self.last_pts = pts
         packet = av.Packet(header + data)

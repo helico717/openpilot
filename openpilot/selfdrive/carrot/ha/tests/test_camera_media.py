@@ -101,3 +101,18 @@ class MuxTests(unittest.TestCase):
         self.assertEqual(mux2.last_pts, 18000)
         mux1.close()
         mux2.close()
+
+    def test_camera_timestamp_before_origin_clamps_and_increases_monotonically(self):
+        common_origin = 1_000_000_000
+        mux = media.TransportMux()
+        frames = list(encoded_frames())
+        # Frame 0 arrives with timestamp 50ms before common_origin
+        h0, d0, _ = frames[0]
+        mux.push(h0, d0, common_origin - 50_000_000, origin_ns=common_origin)
+        self.assertEqual(mux.last_pts, 0)
+        # Frame 1 arrives with timestamp 10ms after common_origin
+        h1, d1, _ = frames[1]
+        mux.push(h1, d1, common_origin + 10_000_000, origin_ns=common_origin)
+        self.assertEqual(mux.last_pts, 900)
+        mux.close()
+

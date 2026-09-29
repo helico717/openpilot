@@ -104,7 +104,11 @@ def run(session_id):
                 sof_ns = int(packet.idx.timestampSof)
                 if common_origin_ns is None and packet.header:
                     common_origin_ns = sof_ns
-                payload = muxes[camera].push(bytes(packet.header), bytes(packet.data), sof_ns, origin_ns=common_origin_ns)
+                try:
+                    payload = muxes[camera].push(bytes(packet.header), bytes(packet.data), sof_ns, origin_ns=common_origin_ns)
+                except Exception as err:
+                    sys.stderr.write(f'Mux error on {camera}: {err}\n')
+                    continue
                 if payload:
                     seen[camera] = now
                 for offset in range(0, len(payload), MAX_PAYLOAD):
