@@ -141,7 +141,7 @@ class Engine:
             if trip.get('last_point'):s['parking']=dict(trip['last_point'],measured_at=stamp(end))
             s['trip']=None
         if gps:
-            s['gps']=dict(gps,measured_at=stamp(now))
+            s['gps']=dict(gps,measured_at=stamp(now),fresh=True)
             if onroad is False:s['parking']=dict(gps,measured_at=stamp(now))
         s['onroad']=onroad
         if sampled is not None:

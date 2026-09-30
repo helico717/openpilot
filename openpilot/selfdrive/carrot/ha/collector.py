@@ -182,7 +182,8 @@ def main():
                         'longitude': float(g.longitude),
                         'speedMps': float(g.speed),
                         'bearingDeg': float(g.bearingDeg),
-                        'accuracyM': float(g.horizontalAccuracy)
+                        'accuracyM': float(g.horizontalAccuracy),
+                        'fresh': True,
                     }
                     import math
                     if not all(math.isfinite(v) for v in gps.values()) or abs(gps['latitude']) > 90 or abs(gps['longitude']) > 180:

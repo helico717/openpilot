@@ -610,6 +610,7 @@ def main() -> None:
           payload["gps"]["speedMps"] = float(gps.speed)
           payload["gps"]["bearingDeg"] = float(gps.bearingDeg)
           payload["gps"]["accuracyM"] = float(gps.horizontalAccuracy)
+          payload["gps"]["fresh"] = True
           break
 
     if post_state(config, payload):
