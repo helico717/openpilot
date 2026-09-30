@@ -14,8 +14,8 @@ import time
 ROOT = Path(__file__).resolve().parents[5]
 sys.path[:0] = [str(ROOT), str(ROOT / 'pydeps')]
 
-from .protocol import MAX_PAYLOAD, encode_media
-from .media import TransportMux
+from .protocol import MAX_PAYLOAD, encode_frame
+from .media import NalFrameAssembler
 from .probe import active_camera_processes, require_offroad, stop_owned, param_bool
 from .compatibility import require_runtime
 
@@ -66,7 +66,7 @@ def run(session_id):
         # both the bootstrap keyframe and reference frames during scheduling
         # delays; only decoded display frames may safely be conflated.
         sockets = [messaging.sub_sock(name, poller=poller, conflate=False) for name in names]
-        muxes = {name: TransportMux() for name in names.values()}
+        muxes = {name: NalFrameAssembler(name) for name in names.values()}
         require_offroad(params)
         if active_camera_processes() or params.get_bool('IsTakingSnapshot'):
             raise RuntimeError('Camera became busy')
@@ -87,7 +87,6 @@ def run(session_id):
                 cwd=binary.parent, env=environment, stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True))
         seen = {}
-        common_origin_ns = None
         while not lease['stopped'] and time.monotonic() - started < 300:
             require_offroad(params)
             now = time.monotonic()
@@ -102,17 +101,10 @@ def run(session_id):
                 camera = names[event.which()]
                 packet = getattr(event, event.which())
                 sof_ns = int(packet.idx.timestampSof)
-                if common_origin_ns is None and packet.header:
-                    common_origin_ns = sof_ns
-                try:
-                    payload = muxes[camera].push(bytes(packet.header), bytes(packet.data), sof_ns, origin_ns=common_origin_ns)
-                except Exception as err:
-                    sys.stderr.write(f'Mux error on {camera}: {err}\n')
-                    continue
-                if payload:
+                is_key = bool(packet.idx.flags & 1) if hasattr(packet.idx, 'flags') else False
+                wire = muxes[camera].process(bytes(packet.header), bytes(packet.data), sof_ns, is_key=is_key)
+                if wire:
                     seen[camera] = now
-                for offset in range(0, len(payload), MAX_PAYLOAD):
-                    wire = encode_media(session_id, camera, payload[offset:offset + MAX_PAYLOAD])
                     pending.extend(struct.pack('!I', len(wire)))
                     pending.extend(wire)
             if len(pending) > 2 * 1024 * 1024:

@@ -19,9 +19,11 @@ def require_runtime(root: Path):
         raise RuntimeError('GNU timeout unavailable') from exc
     if 'GNU coreutils' not in version:
         raise RuntimeError('GNU timeout required')
-    import av
-    if not hasattr(av.container.OutputContainer, 'add_stream_from_template'):
-        raise RuntimeError('PyAV template remux API unavailable')
+    from .protocol import encode_frame, decode_frame
+    test_frame = encode_frame('wide', b'\x00\x00\x00\x01\x67\x42\x00\x1f', is_key=True, timestamp_us=1000)
+    decoded = decode_frame(test_frame)
+    if decoded['camera'] != 'wide' or not decoded['is_key']:
+        raise RuntimeError('WLV1 camera wire protocol test failed')
     from openpilot.cereal import messaging
     from openpilot.cereal.services import SERVICE_LIST
     for name in STREAMS:

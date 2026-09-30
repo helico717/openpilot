@@ -101,7 +101,7 @@ class DeviceAgent:
             raise ValueError('Invalid control')
         kind = data.get('type')
         if kind == 'hello':
-            if data.get('protocol') != 1:
+            if data.get('protocol') not in (1, 2):
                 raise ValueError('Unsupported protocol')
             return
         session_id = data.get('session_id')
