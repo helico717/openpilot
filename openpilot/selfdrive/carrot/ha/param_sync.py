@@ -6,7 +6,7 @@
 - Acknowledges applied parameter changes back to Cloudflare Worker.
 """
 from __future__ import annotations
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 import json
 import logging
 import math
@@ -19,6 +19,7 @@ import urllib.request
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent
+STATE = Path("/data/carrot_ha")
 LOCAL_SERVER_URL = "http://127.0.0.1:7000"
 
 
@@ -226,6 +227,36 @@ class ProcessedQueueStore:
             print(f"[param_sync] prune error: {err}", flush=True)
 
 
+class PollSchedule:
+    """15s idle, 3s while editing/draining commands, bounded failure backoff."""
+    def __init__(self):
+        self.active_until = 0.0
+        self.failures = 0
+
+    def delay(self, response, now):
+        if not response or not response.get("ok"):
+            self.failures = min(self.failures + 1, 4)
+            return min(120, 15 * 2 ** (self.failures - 1))
+        self.failures = 0
+        if response.get("pending") or response.get("poll_after_s") == 3:
+            self.active_until = now + 60
+        return 3 if now < self.active_until else 15
+
+
+def persistent_queue_store():
+    """Preserve legacy ACK identities while keeping new state outside Git."""
+    target = STATE / "param_sync.sqlite3"
+    legacy = BASE / "state" / "param_sync.sqlite3"
+    if not target.exists() and legacy.exists():
+        STATE.mkdir(parents=True, exist_ok=True)
+        temporary = target.with_suffix(".migrating")
+        with closing(sqlite3.connect(f"file:{legacy}?mode=ro", uri=True)) as source:
+            with closing(sqlite3.connect(temporary)) as destination:
+                source.backup(destination)
+        temporary.replace(target)
+    return ProcessedQueueStore(target)
+
+
 def run_param_sync(config: dict, store: ProcessedQueueStore | None = None):
     """Main loop for parameter synchronization with idempotency guarantee."""
     cloud_url = config.get("url", "").rstrip("/")
@@ -237,43 +268,21 @@ def run_param_sync(config: dict, store: ProcessedQueueStore | None = None):
         return
 
     if store is None:
-        store = ProcessedQueueStore(BASE / "state" / "param_sync.sqlite3")
+        store = persistent_queue_store()
 
     headers = {"Authorization": f"Bearer {token}"}
-    last_catalog_sync = 0.0
+    last_catalog_sync = float("-inf")
+    last_catalog_attempt = float("-inf")
+    schedule = PollSchedule()
     CATALOG_SYNC_INTERVAL = 180.0  # Sync full catalog every 3 minutes
 
     print(f"[param_sync] starting CarrotPilot parameter sync loop for device: {device_id}", flush=True)
     print(f"[param_sync] target Cloudflare Worker: {cloud_url}", flush=True)
 
     while True:
-        now = time.time()
+        now = time.monotonic()
 
-        # 1. Periodic full settings snapshot upload
-        if now - last_catalog_sync >= CATALOG_SYNC_INTERVAL:
-            snapshot = fetch_local_settings_snapshot()
-            if snapshot and snapshot.get("settings") and snapshot.get("values"):
-                sync_payload = {
-                    "device_id": device_id,
-                    "catalog": snapshot["settings"],
-                    "values": snapshot["values"],
-                }
-                print(f"[param_sync] uploading {len(snapshot['values'])} parameters to Cloudflare...", flush=True)
-                res = _http_request(
-                    f"{cloud_url}/api/settings/sync",
-                    data=sync_payload,
-                    headers=headers,
-                    timeout=15.0
-                )
-                if res and res.get("ok"):
-                    last_catalog_sync = now
-                    print(f"[param_sync] settings snapshot synced to cloud successfully! ({len(snapshot['values'])} params)", flush=True)
-                else:
-                    print(f"[param_sync] settings sync response: {res}", flush=True)
-            else:
-                print("[param_sync] no settings snapshot available to upload", flush=True)
-
-        # 2. Poll for pending parameter changes from Home Assistant
+        # Poll for pending parameter changes from Home Assistant
         pending_res = _http_request(
             f"{cloud_url}/api/params/pending?device_id={urllib.parse.quote(device_id)}",
             headers=headers,
@@ -285,6 +294,7 @@ def run_param_sync(config: dict, store: ProcessedQueueStore | None = None):
             pending_list = pending_res.get("pending", [])
             if pending_list:
                 applied_ids = []
+                failed_ids = []
                 current_values = {}
                 any_new_applied = False
 
@@ -307,6 +317,8 @@ def run_param_sync(config: dict, store: ProcessedQueueStore | None = None):
                                 pass
                             current_values[param_name] = val
                             print(f"[param_sync] queue item {item_id} ({param_name}) already applied ({existing['actual_val']}); skipping local write and resending ACK", flush=True)
+                        elif existing["status"] == "failed":
+                            failed_ids.append(item_id)
                         continue
 
                     parsed_val = raw_val
@@ -334,15 +346,18 @@ def run_param_sync(config: dict, store: ProcessedQueueStore | None = None):
                         print(f"[param_sync] applied param {param_name} = {parsed_val} (verified: {actual_val})", flush=True)
                     else:
                         store.record(item_id, device_id, param_name, parsed_val, "", "failed")
+                        failed_ids.append(item_id)
                         print(f"[param_sync] rejected or failed param {param_name} = {parsed_val}", flush=True)
 
-                if applied_ids:
+                if applied_ids or failed_ids:
                     # If new parameter was applied, upload fresh snapshot immediately
                     if any_new_applied:
+                        last_catalog_attempt = now
+                        last_catalog_sync = float("-inf")
                         try:
                             fresh_snapshot = fetch_local_settings_snapshot()
                             if fresh_snapshot and fresh_snapshot.get("settings") and fresh_snapshot.get("values"):
-                                _http_request(
+                                fresh_result = _http_request(
                                     f"{cloud_url}/api/settings/sync",
                                     data={
                                         "device_id": device_id,
@@ -353,13 +368,17 @@ def run_param_sync(config: dict, store: ProcessedQueueStore | None = None):
                                     timeout=15.0,
                                     verbose=False
                                 )
-                                last_catalog_sync = now
+                                if fresh_result and fresh_result.get("ok"):
+                                    last_catalog_sync = now
+                                else:
+                                    last_catalog_sync = float("-inf")
                         except Exception as e:
                             print(f"[param_sync] immediate snapshot sync error: {e}", flush=True)
 
                     ack_payload = {
                         "device_id": device_id,
                         "applied_ids": applied_ids,
+                        "failed_ids": failed_ids,
                         "current_values": current_values
                     }
                     ack_res = _http_request(
@@ -369,13 +388,39 @@ def run_param_sync(config: dict, store: ProcessedQueueStore | None = None):
                         timeout=10.0
                     )
                     if ack_res and ack_res.get("ok"):
-                        store.mark_acked(applied_ids)
+                        store.mark_acked(applied_ids + failed_ids)
                         print(f"[param_sync] acknowledged {len(applied_ids)} applied params to cloud successfully", flush=True)
                     else:
+                        pending_res = None  # Back off failed ACK transport too.
                         print(f"[param_sync] WARNING: failed to acknowledge {len(applied_ids)} params to cloud (will retry ACK on next poll)", flush=True)
 
-        # Poll interval: 3 seconds
-        time.sleep(3)
+        # Periodic catalog work follows command handling, never delays queued edits.
+        if now - last_catalog_sync >= CATALOG_SYNC_INTERVAL and now - last_catalog_attempt >= 15:
+            last_catalog_attempt = now
+            snapshot = fetch_local_settings_snapshot()
+            if snapshot and snapshot.get("settings") and snapshot.get("values"):
+                sync_payload = {
+                    "device_id": device_id,
+                    "catalog": snapshot["settings"],
+                    "values": snapshot["values"],
+                }
+                print(f"[param_sync] uploading {len(snapshot['values'])} parameters to Cloudflare...", flush=True)
+                res = _http_request(
+                    f"{cloud_url}/api/settings/sync",
+                    data=sync_payload,
+                    headers=headers,
+                    timeout=15.0
+                )
+                if res and res.get("ok"):
+                    last_catalog_sync = now
+                    print(f"[param_sync] settings snapshot synced to cloud successfully! ({len(snapshot['values'])} params)", flush=True)
+                else:
+                    print(f"[param_sync] settings sync response: {res}", flush=True)
+            else:
+                print("[param_sync] no settings snapshot available to upload", flush=True)
+
+        delay = schedule.delay(pending_res, time.monotonic())
+        time.sleep(max(0, now + delay - time.monotonic()))
 
 
 def start_param_sync_thread(config: dict) -> threading.Thread:
@@ -385,7 +430,7 @@ def start_param_sync_thread(config: dict) -> threading.Thread:
 
 
 if __name__ == "__main__":
-    conn_file = BASE / "connection.json"
+    conn_file = STATE / "connection.json"
     if not conn_file.exists():
         conn_file = Path("/data/id4-collector/connection.json")
     if conn_file.exists():
