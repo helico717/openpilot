@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: write
-  workflows: write
 
 jobs:
   sync:
@@ -19,6 +18,7 @@ jobs:
         with:
           ref: carrot-wip-model_selector-ha
           fetch-depth: 0
+          token: ${{ secrets.SYNC_PAT || github.token }}
 
       - name: Configure Git identity
         run: |
@@ -29,5 +29,25 @@ jobs:
         run: |
           git remote add upstream https://github.com/ajouatom/openpilot.git || true
           git fetch upstream happymaj11r/carrot-wip-model_selector
+
+          if git merge-base --is-ancestor upstream/happymaj11r/carrot-wip-model_selector HEAD; then
+            echo "Already up-to-date with upstream happymaj11r/carrot-wip-model_selector."
+            exit 0
+          fi
+
           git merge upstream/happymaj11r/carrot-wip-model_selector --no-edit -m "chore: auto-sync upstream happymaj11r/carrot-wip-model_selector"
-          git push origin carrot-wip-model_selector-ha
+
+          if ! git push origin carrot-wip-model_selector-ha; then
+            echo "Push failed. Checking if workflow file modifications caused remote rejection..."
+            if git diff HEAD~1 HEAD --name-only | grep -E '^\.github/workflows/'; then
+              echo "Workflow files were modified in upstream. Reverting workflow modifications to allow push using default GITHUB_TOKEN..."
+              git checkout HEAD~1 -- .github/workflows/
+              git commit --amend --no-edit
+              git push origin carrot-wip-model_selector-ha
+              echo "Successfully pushed upstream changes with local workflows preserved."
+              echo "Tip: To automatically sync .github/workflows changes too, configure a Personal Access Token with 'workflow' scope as repository secret SYNC_PAT."
+            else
+              echo "Push failed due to an error other than workflow permissions."
+              exit 1
+            fi
+          fi
