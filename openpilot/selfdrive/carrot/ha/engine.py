@@ -57,6 +57,7 @@ class Engine:
             self.s['trip'].pop('last_motion', None)
             self.s['trip'].pop('last_clock', None)
             self.s['trip']['distance_complete'] = False
+            self.s['trip']['energy_complete'] = False
     def tick(self,now,onroad,gps=None,sampled=None,enabled=None,motion=None,diagnostics=None,monotonic_now=None):
         for key, value in (diagnostics or {}).items():
             self.s['vehicle'][key] = value
@@ -77,10 +78,34 @@ class Engine:
                 self.s['trip'].pop('last_point',None)
                 self.s['trip'].pop('last_motion',None)
                 self.s['trip']['distance_complete']=False
+                self.s['trip']['energy_complete']=False
         events=[];s=self.s;changed=onroad!=s.get('onroad');old_onroad=s.get('onroad')
         trip=s.get('trip')
         if onroad and not trip:
             trip=s['trip']={'id':str(uuid.uuid4()),'deviceId':self.device,'startedAt':stamp(now),'durationS':0,'distanceM':0,'route':[],'last_at':now,'partial':old_onroad is None,'distance_complete':True,'distance_source':'can_speed'}
+        if trip:
+            # Capture the actual CAN measurement, including the final driving
+            # boundary, before telemetry throttling or the offroad transition.
+            wh = (sampled or {}).get('battery_wh')
+            soc = (sampled or {}).get('soc_percent')
+            valid_wh = type(wh) in (int,float) and math.isfinite(wh) and 0 <= wh <= 150000
+            valid_soc = type(soc) in (int,float) and math.isfinite(soc) and 0 <= soc <= 100
+            if valid_wh or valid_soc:
+                point = {'at':stamp(now), 'battery_wh':wh if valid_wh else None,
+                         'soc_percent':soc if valid_soc else None}
+                previous = trip.get('energy_end')
+                if previous:
+                    t = datetime.fromisoformat(previous['at']).timestamp()
+                    old_wh = previous.get('battery_wh')
+                    if (not valid_wh or old_wh is None or now-t > 120
+                            or (wh != old_wh and (now <= t or abs(wh-old_wh)*3600/(now-t) > 250000))):
+                        trip['energy_complete'] = False
+                else:
+                    trip.setdefault('energy_complete', valid_wh and now-datetime.fromisoformat(trip['startedAt']).timestamp() <= 5)
+                    trip['energy_start'] = point
+                trip['energy_end'] = point
+            elif sampled is not None and 'battery_wh' in sampled:
+                trip['energy_complete'] = False
         if trip and onroad:
             clock = now if monotonic_now is None else monotonic_now
             dt = clock-trip.get('last_clock', clock)
@@ -137,6 +162,12 @@ class Engine:
                                         'odometerStart':a,'odometerEnd':b}
             if not trip.get('distance_complete'):payload['partial']=True
             payload.update(endedAt=stamp(end),durationS=round(trip['durationS']),distanceM=round(trip['distanceM'],1))
+            start_point, end_point = trip.get('energy_start'), trip.get('energy_end')
+            complete = bool(trip.get('energy_complete') and start_point and end_point
+                and abs(end-datetime.fromisoformat(end_point['at']).timestamp()) <= 5
+                and datetime.fromisoformat(start_point['at']) < datetime.fromisoformat(end_point['at']))
+            payload['tripMeasurements'] = {'start':start_point, 'end':end_point, 'complete':complete}
+
             if payload['distanceM']>=100:events.append(('/api/trips',payload))
             if trip.get('last_point'):s['parking']=dict(trip['last_point'],measured_at=stamp(end))
             s['trip']=None
