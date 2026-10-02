@@ -26,6 +26,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Fetch and Merge Upstream
+        env:
+          SYNC_WORKFLOWS: ${{ secrets.SYNC_PAT != '' }}
         run: |
           git remote add upstream https://github.com/ajouatom/openpilot.git || true
           git fetch upstream happymaj11r/carrot-wip-model_selector
@@ -35,19 +37,24 @@ jobs:
             exit 0
           fi
 
+          # Keep this fork's CI configuration, including workflow additions/deletions.
+          # GITHUB_TOKEN cannot push upstream workflow changes. Save the exact
+          # pre-merge tree rather than relying on HEAD~1 after an amend.
+          base_commit=$(git rev-parse HEAD)
           git merge upstream/happymaj11r/carrot-wip-model_selector --no-edit -m "chore: auto-sync upstream happymaj11r/carrot-wip-model_selector"
 
-          if ! git push origin carrot-wip-model_selector-ha; then
-            echo "Push failed. Checking if workflow file modifications caused remote rejection..."
-            if git diff HEAD~1 HEAD --name-only | grep -E '^\.github/workflows/'; then
-              echo "Workflow files were modified in upstream. Reverting workflow modifications to allow push using default GITHUB_TOKEN..."
-              git checkout HEAD~1 -- .github/workflows/
+          if [ "$SYNC_WORKFLOWS" != "true" ]; then
+            # No-overlay also removes added workflows and restores deleted ones.
+            git restore --source="$base_commit" --staged --worktree --no-overlay -- .github/workflows/
+            if ! git diff --cached --quiet; then
               git commit --amend --no-edit
-              git push origin carrot-wip-model_selector-ha
-              echo "Successfully pushed upstream changes with local workflows preserved."
-              echo "Tip: To automatically sync .github/workflows changes too, configure a Personal Access Token with 'workflow' scope as repository secret SYNC_PAT."
-            else
-              echo "Push failed due to an error other than workflow permissions."
-              exit 1
             fi
+            git diff --exit-code "$base_commit" HEAD -- .github/workflows/
+            echo "Preserved fork workflows for GITHUB_TOKEN; upstream code merged."
+          else
+            echo "Syncing upstream workflows using SYNC_PAT (requires workflow write permission)."
           fi
+
+          # Report unrelated push failures directly rather than treating every
+          # failure as a workflow permission error.
+          git push origin carrot-wip-model_selector-ha
