@@ -6,6 +6,8 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 
+MEB_INVALID_ENERGY_WH = {102250, 102300, 102350, 102375}
+
 def stamp(t): return datetime.fromtimestamp(t,timezone.utc).isoformat(timespec='seconds')
 def distance(a,b):
     p1,p2=math.radians(a['latitude']),math.radians(b['latitude'])
@@ -51,6 +53,12 @@ class Engine:
         self.s.setdefault('field_measured_at',{})
         self.s.setdefault('charge_months',{})
         self.s.setdefault('charge_sessions',[])
+        if self.s['vehicle'].get('battery_wh') in MEB_INVALID_ENERGY_WH:
+            for key in ('battery_wh','soc_percent','charge_power_w','charging'):
+                self.s['vehicle'].pop(key, None)
+            self.s['field_measured_at'].pop('battery_wh', None)
+            self.s.pop('energy_sample', None)
+            self.s.pop('charge_candidate', None)
         self.last_saved=0
         charge=self.s.get('charge')
         if charge and 'fast' not in charge:
@@ -68,6 +76,10 @@ class Engine:
             self.s['trip']['distance_complete'] = False
             self.s['trip']['energy_complete'] = False
     def tick(self,now,onroad,gps=None,sampled=None,enabled=None,motion=None,diagnostics=None,monotonic_now=None):
+        if sampled and sampled.get('battery_wh') in MEB_INVALID_ENERGY_WH:
+            sampled=dict(sampled)
+            sampled.pop('battery_wh', None)
+            sampled.pop('soc_percent', None)
         for key, value in (diagnostics or {}).items():
             self.s['vehicle'][key] = value
             self.s['field_measured_at'][key] = stamp(now)
@@ -243,7 +255,7 @@ class Engine:
         at least 50 Wh confirm a small increase. These are heuristic thresholds,
         not a charger connection signal. Keep the existing 90-240 second window.
         """
-        if not isinstance(wh,(int,float)) or not math.isfinite(wh) or wh<=0:
+        if not isinstance(wh,(int,float)) or not math.isfinite(wh) or wh<=0 or wh in MEB_INVALID_ENERGY_WH:
             return
         s=self.s
         prev=s.get('energy_sample')

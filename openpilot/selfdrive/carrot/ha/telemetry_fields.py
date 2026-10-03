@@ -72,3 +72,15 @@ def device_health(device):
         if value is not None:
             result[key] = str(value)
     return result
+
+
+def decode_battery_energy(vl_all):
+    """Reject MEB DBC Init/Fehler codes; try the alternate valid signal."""
+    for message, signal, maximum in [('Motor_16','MO_Energieinhalt_BMS',102325),
+                                     ('HVEM_02','HVEM_Nutzbare_Energie',102200)]:
+        samples=vl_all.get(message, {}).get(signal)
+        if samples:
+            value=samples[-1] if isinstance(samples,(list,tuple)) else samples
+            if type(value) in (int,float) and math.isfinite(value) and 0 < value <= maximum:
+                return float(value)
+    return None

@@ -22,9 +22,9 @@ import requests
 from openpilot.cereal import messaging
 from openpilot.common.params import Params
 try:
-    from .telemetry_fields import OPTIONAL_MESSAGES, decode_optional
+    from .telemetry_fields import OPTIONAL_MESSAGES, decode_optional, decode_battery_energy
 except (ImportError, ValueError):
-    from telemetry_fields import OPTIONAL_MESSAGES, decode_optional
+    from telemetry_fields import OPTIONAL_MESSAGES, decode_optional, decode_battery_energy
 
 CONFIG_PATH = Path(os.getenv("WAYON_CLOUD_CONFIG", "/data/wayon_cloud/config.json"))
 STATE_PATH = Path(os.getenv("WAYON_VEHICLE_STATE", "/data/wayon_cloud/vehicle_state.json"))
@@ -238,12 +238,9 @@ def sample_vehicle_can(timeout_s: float = 6.0) -> dict:
         continue
 
       # vl은 미수신이어도 기본값 0을 주므로, vl_all(이번 update에서 실제 수신된 값)로 판정한다
-      wh = cp.vl_all["Motor_16"].get("MO_Energieinhalt_BMS") or \
-           cp.vl_all["HVEM_02"].get("HVEM_Nutzbare_Energie")
-      if wh:
-        v_wh = wh[-1] if isinstance(wh, (list, tuple)) else wh
-        if v_wh > 0:
-          result["battery_wh"] = float(v_wh)
+      v_wh = decode_battery_energy(cp.vl_all)
+      if v_wh is not None:
+        result["battery_wh"] = v_wh
       if cp.vl_all["Diagnose_01"].get("KBI_Kilometerstand"):
         odo = cp.vl["Diagnose_01"]["KBI_Kilometerstand"]
         if 0 < odo <= ODO_MAX_VALID_KM:
