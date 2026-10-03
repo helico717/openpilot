@@ -52,6 +52,15 @@ class Engine:
         self.s.setdefault('charge_months',{})
         self.s.setdefault('charge_sessions',[])
         self.last_saved=0
+        charge=self.s.get('charge')
+        if charge and 'fast' not in charge:
+            # Legacy active sessions have no contribution journal. Preserve
+            # their totals; only retain fast evidence for future additions.
+            duration=charge.get('duration_s',0)
+            charge['fast']=bool(duration > 0 and charge.get('energy_kwh',0)*3600000/duration > 11000)
+        candidate=self.s.get('charge_candidate')
+        if candidate and any('end_wh' not in w for w in candidate.get('windows', [])):
+            self.s.pop('charge_candidate', None)
         if self.s.get('trip'):
             self.s['trip']['partial']=True
             self.s['trip'].pop('last_motion', None)
@@ -254,7 +263,8 @@ class Engine:
             s.pop('charge_candidate',None)
             if estimate>250000 and s.get('charge'):s['charge']['partial']=True
             return
-        window={'started_at':prev['at'],'ended_at':now,'delta':delta,'dt':dt,'power':estimate}
+        window={'started_at':prev['at'],'ended_at':now,'delta':delta,'dt':dt,'power':estimate,
+                'start_wh':prev['wh'],'end_wh':wh}
         if s.get('charge'):
             windows=[window]
         else:
@@ -266,13 +276,40 @@ class Engine:
             s['charge']={'id':str(uuid.uuid4()),'started_at':stamp(windows[0]['started_at']),
                          'energy_kwh':0,'duration_s':0,'partial':False}
             s.pop('charge_candidate',None)
+        charge=s['charge']
+        # Track only this session's contributions so a later fast window can
+        # reclassify its startup energy without moving unrelated AC sessions.
+        charge.setdefault('month_energy', {})
+        charge.setdefault('peak_wh', windows[0]['start_wh'])
+        if any(w['power']>11000 for w in windows) and not charge.get('fast'):
+            for month, kwh in charge['month_energy'].items():
+                ledger=s['charge_months'][month]
+                ledger['slow_kwh']=max(0, ledger['slow_kwh']-kwh)
+                ledger['fast_kwh']+=kwh
+                ledger['cost_krw']+=kwh*(320-280)
+            charge['fast']=True
+        kind='fast' if charge.get('fast') else 'slow'
+        accepted=False
         for w in windows:
+            # A dip then rebound to an already counted BMS value is not new
+            # charge. The peak persists through restart and zero-power windows.
+            added=max(0, w['end_wh']-charge['peak_wh'])
+            # The CAN signals are quantized in 25/50 Wh steps. Do not
+            # confirm a lone 25 Wh tail fluctuation; retain the counted
+            # peak so genuine smaller increases can accumulate to 50 Wh.
+            if added < 50:
+                continue
+            charge['peak_wh']=w['end_wh']
+            accepted=True
             month=datetime.fromtimestamp(w['ended_at'],timezone(timedelta(hours=9))).strftime('%Y-%m')
             ledger=s['charge_months'].setdefault(month,{'slow_kwh':0,'fast_kwh':0,'cost_krw':0})
-            kind='slow' if w['power']<=11000 else 'fast'
-            ledger[kind+'_kwh']+=w['delta']/1000
-            ledger['cost_krw']+=w['delta']/1000*(280 if kind=='slow' else 320)
-            s['charge']['energy_kwh']+=w['delta']/1000
-            s['charge']['duration_s']+=w['dt']
+            kwh=added/1000
+            ledger[kind+'_kwh']+=kwh
+            ledger['cost_krw']+=kwh*(280 if kind=='slow' else 320)
+            charge['month_energy'][month]=charge['month_energy'].get(month,0)+kwh
+            charge['energy_kwh']+=kwh
+            charge['duration_s']+=w['dt']
+        if not accepted:
+            return
         s['charge']['ended_at']=stamp(now)
         s['last_charge_increase']=now
