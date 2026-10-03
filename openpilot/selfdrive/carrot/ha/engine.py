@@ -101,7 +101,9 @@ class Engine:
                             or (wh != old_wh and (now <= t or abs(wh-old_wh)*3600/(now-t) > 250000))):
                         trip['energy_complete'] = False
                 else:
-                    trip.setdefault('energy_complete', valid_wh and now-datetime.fromisoformat(trip['startedAt']).timestamp() <= 5)
+                    # CAN sampling takes up to 4s, then sleeps 26s. Boundaries
+                    # must allow one sampling cycle rather than one engine tick.
+                    trip.setdefault('energy_complete', valid_wh and now-datetime.fromisoformat(trip['startedAt']).timestamp() <= 35)
                     trip['energy_start'] = point
                 trip['energy_end'] = point
             elif sampled is not None and 'battery_wh' in sampled:
@@ -164,7 +166,7 @@ class Engine:
             payload.update(endedAt=stamp(end),durationS=round(trip['durationS']),distanceM=round(trip['distanceM'],1))
             start_point, end_point = trip.get('energy_start'), trip.get('energy_end')
             complete = bool(trip.get('energy_complete') and start_point and end_point
-                and abs(end-datetime.fromisoformat(end_point['at']).timestamp()) <= 5
+                and abs(end-datetime.fromisoformat(end_point['at']).timestamp()) <= 35
                 and datetime.fromisoformat(start_point['at']) < datetime.fromisoformat(end_point['at']))
             payload['tripMeasurements'] = {'start':start_point, 'end':end_point, 'complete':complete}
 
