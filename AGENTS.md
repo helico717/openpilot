@@ -14,6 +14,11 @@ not a new runtime release. A current explicit local-only request overrides this
 workflow. Never edit device sources through SSH/SCP or reboot it on the user's
 behalf. Report publication blockers accurately.
 
+For upstream-sync failures, follow the incident response and reporting section in
+`openpilot/selfdrive/carrot/ha/AGENTS.md`. It includes the verified October 3
+workflow conflict history. Distinguish investigation, published fixes and actual
+successful Actions runs, and never report desktop test failures as device faults.
+
 # Repository memory
 
 - On 2026-10-03, the user requested a manual compatibility option for intermittent
