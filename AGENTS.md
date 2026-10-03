@@ -1,3 +1,19 @@
+# Carrot HA deployment ownership — 2026-10-03
+
+For Carrot HA integration work, use `helico717/openpilot` branch
+`carrot-wip-model_selector-ha`; this is an explicit exception to unrelated
+branch-consolidation instructions below. Read
+`openpilot/selfdrive/carrot/ha/AGENTS.md` for the daemon contract.
+The agent completes implementation, validation, Git commit/push and remote
+verification. The user only runs a clean Git pull and reboots Comma.
+Never leave local Carrot HA modifications for the user to commit or push.
+HA changes belong to `helico717/carrot-ha`: the agent publishes the versioned
+HACS release and performs required Worker/D1 deployment; the user only installs
+the HACS update and restarts HA. Instructions-only changes need commit/push,
+not a new runtime release. A current explicit local-only request overrides this
+workflow. Never edit device sources through SSH/SCP or reboot it on the user's
+behalf. Report publication blockers accurately.
+
 # Repository memory
 
 - On 2026-10-02, after the native CPU experiment and Ioniq 5 PE before/after

@@ -23,3 +23,23 @@ branch-consolidation history. HA/Worker/card changes belong to helico717/carrot-
   path. Full release validation also includes carrot-ha's incremental Worker and
   dashboard tests, D1 migration before Worker deployment, and operational 24-hour
   quota/freshness observation. Local results are not physical-device validation.
+
+## Deployment ownership — 2026-10-03
+
+- Carrot HA work includes preparing an installable update. Unless the user
+  explicitly requests local-only work for the current task, the agent must
+  implement, validate, commit and push daemon changes to
+  `origin/carrot-wip-model_selector-ha`, then verify the remote commit.
+  Never leave local source changes for the user to commit or push.
+- The user only pulls the published commit on Comma and reboots:
+  `cd /data/openpilot && git pull --ff-only && sudo reboot`.
+  Do not add `git reset --hard` by default or reboot the device on the user's behalf.
+- In the companion `helico717/carrot-ha` repository, the agent owns HA version
+  bumps within 0.8.x, release notes, main/tag pushes and verification that the
+  GitHub Release/Actions succeeded. The user only updates through HACS and
+  restarts HA. Follow that repository's AGENTS.md for the complete workflow.
+- The agent also owns required Worker/D1 changes and deployment, with migrations
+  before the Worker. Do not deploy unchanged services. For instructions-only
+  changes, commit and push without a new runtime release.
+- If publication is blocked, report the actual remaining step and blocker;
+  do not claim the device can install unpublished local changes.
