@@ -45,6 +45,7 @@ class CaptureClient:
         self.sequence = 0
         self.enabled = False
         self.until = 0
+        self.continuous = False
         self.destination = None
         self.dropped = 0
         self.last_error = None
@@ -53,7 +54,7 @@ class CaptureClient:
         self.spool_bytes = sum(p.stat().st_size for p in self.pending)
 
     def status(self):
-        value = dict(enabled=self.enabled, until=self.until, pending=len(self.pending),
+        value = dict(enabled=self.enabled, continuous=self.continuous, until=self.until, pending=len(self.pending),
                      pending_bytes=self.spool_bytes, delivered_batches=self.delivered,
                      dropped_frames=self.dropped, last_error=self.last_error, updated_at=time.time())
         temp = self.root / 'status.tmp'
@@ -101,11 +102,12 @@ class CaptureClient:
                     response.raise_for_status()
                     status = await response.json()
                 self.enabled = status.get('enabled') is True
-                self.until = status.get('until', 0)
+                self.until = status.get('until') or 0
+                self.continuous = status.get('continuous') is True
                 self.last_error = None
             except Exception as error:
                 # Preserve an already authorized capture during transient network outages.
-                self.enabled = time.time() < self.until and getattr(error, 'status', None) not in (401, 403)
+                self.enabled = (self.continuous or time.time() < self.until) and getattr(error, 'status', None) not in (401, 403)
                 self.last_error = 'discovery/status ' + type(error).__name__
             await asyncio.sleep(15 if self.enabled else 30)
 
@@ -149,7 +151,7 @@ class CaptureClient:
             try:
                 while True:
                     # A separate subscriber does not consume the telemetry reader's messages.
-                    active = self.enabled and time.time() < self.until
+                    active = self.enabled and (self.continuous or time.time() < self.until)
                     if active and sock is None:
                         sock = messaging.sub_sock('can', timeout=0)
                     elif not active and sock is not None:

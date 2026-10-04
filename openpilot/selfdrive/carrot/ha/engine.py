@@ -59,6 +59,8 @@ class Engine:
             self.s['field_measured_at'].pop('battery_wh', None)
             self.s.pop('energy_sample', None)
             self.s.pop('charge_candidate', None)
+        self.s.pop('energy_sample', None)
+        self.s.pop('charge_candidate', None)
         self.last_saved=0
         charge=self.s.get('charge')
         if charge and 'fast' not in charge:
@@ -92,7 +94,6 @@ class Engine:
         if onroad is None:
             self.s.pop('energy_sample',None)
             self.s.pop('charge_candidate',None)
-            if self.s.get('charge'):self.s['charge']['partial']=True
             if self.s.get('trip'):
                 self.s['trip']['partial']=True
                 self.s['trip']['last_at']=now
@@ -203,30 +204,36 @@ class Engine:
                 if (value is not None and (not isinstance(value,float) or math.isfinite(value))) or (value is None and key in ('bms_target_soc_percent', 'dcdc_temperature_c')):
                     s['vehicle'][key]=value;s['field_measured_at'][key]=stamp(now)
             if sampled:s['measured_at']=stamp(now)
-            if onroad is not None:self._sample_energy(now, onroad, sampled.get('battery_wh'))
-        # Expire state even when no new CAN sample arrives.
-        candidate=s.get('charge_candidate')
-        if candidate and now-candidate['ended_at']>=300:
-            s.pop('charge_candidate',None)
-        if s.get('charge') and (onroad or now-s.get('last_charge_increase',now)>=300):
-            s['charge_sessions'].append(s.pop('charge'))
-            s['charge_sessions']=s['charge_sessions'][-50:]
-        measured=s.get('field_measured_at',{}).get('battery_wh')
-        fresh=measured is not None and 0<=now-datetime.fromisoformat(measured).timestamp()<=120
-        if onroad:
-            s.pop('charge_candidate',None)
-            if not old_onroad:s.pop('energy_sample',None)
-            s['vehicle'].update(charging=False,charge_power_w=0)
-        elif onroad is None or not fresh:
-            s['vehicle'].update(charging=None,charge_power_w=None)
-        else:
-            s['vehicle']['charging']=bool(s.get('charge'))
+        try:
+            from .charging_mode import charging_mode
+            from .charge_recorder import update as update_can_charge
+        except (ImportError, ValueError):
+            from openpilot.selfdrive.carrot.ha.charging_mode import charging_mode
+            from openpilot.selfdrive.carrot.ha.charge_recorder import update as update_can_charge
+        signal=charging_mode({**s['vehicle'], 'field_measured_at':s['field_measured_at']},now)
+        previous_charging=s['vehicle'].get('charging')
+        previous_mode=s['vehicle'].get('charge_mode')
+        update_can_charge(s,now,signal,sampled.get('battery_wh') if sampled else None)
+        s.pop('charge_candidate',None)
+        s['vehicle'].update(charging=signal['charging'],charge_mode=signal['mode'],
+                            charge_state_source='can_request')
+        if signal['charging'] is not True:
+            s['vehicle']['charge_power_w']=0 if signal['charging'] is False else None
+            s.pop('can_power_sample',None)
+        elif sampled and sampled.get('battery_wh') is not None:
+            previous=s.get('can_power_sample')
+            wh=sampled['battery_wh']
+            if previous and 0<now-previous['at']<=90:
+                power=(wh-previous['wh'])*3600/(now-previous['at'])
+                s['vehicle']['charge_power_w']=round(power) if 0<=power<=250000 else None
+            s['can_power_sample']={'wh':wh,'at':now}
+        changed=changed or previous_charging!=signal['charging'] or previous_mode!=signal['mode']
         interval=30 if onroad else 60
         if changed or now-s.get('last_upload',0)>=interval:
             vehicle=dict(s['vehicle'])
             measured=s['field_measured_at'].get('battery_wh') or s.get('measured_at')
             age=now-datetime.fromisoformat(measured).timestamp() if measured else 999999
-            vehicle.update(field_measured_at=s['field_measured_at'],measured_at=measured,stale=age>120,charge_months=s['charge_months'],charge_sessions=s['charge_sessions'],parking=s.get('parking'))
+            vehicle.update(field_measured_at=s['field_measured_at'],measured_at=measured,stale=age>120,charge_months=s['charge_months'],charge_sessions=s['charge_sessions'],charge_active_session=s.get('charge'),parking=s.get('parking'))
             if vehicle.get('battery_wh') is not None:vehicle.update(capacity_wh=78000,soc_percent=min(100,vehicle['battery_wh']/780))
             events.append(('/api/telemetry',{'deviceId':self.device,'updatedAt':stamp(now),'onroad':int(onroad is True),'ignition':int(comma_onroad),'enabled':enabled,'gps':s.get('gps') or {},'vehicle':vehicle}))
             s['last_upload']=now
@@ -247,81 +254,3 @@ class Engine:
                 if gear=='neutral' and self.s.get('trip'):return True
             return None
         return None if comma_onroad else False
-
-    def _sample_energy(self, now, onroad, wh):
-        """Validate non-overlapping energy windows before committing charge totals.
-
-        100 Wh confirms in one window; two consecutive positive windows totalling
-        at least 50 Wh confirm a small increase. These are heuristic thresholds,
-        not a charger connection signal. Keep the existing 90-240 second window.
-        """
-        if not isinstance(wh,(int,float)) or not math.isfinite(wh) or wh<=0 or wh in MEB_INVALID_ENERGY_WH:
-            return
-        s=self.s
-        prev=s.get('energy_sample')
-        if onroad or not prev or prev['onroad']!=onroad or not 0<=now-prev['at']<=240:
-            s['energy_sample']={'wh':wh,'at':now,'onroad':onroad}
-            s.pop('charge_candidate',None)
-            s['vehicle']['charge_power_w']=0 if onroad else None
-            if s.get('charge'):s['charge']['partial']=True
-            return
-        dt=now-prev['at']
-        if dt<90:return
-        delta=wh-prev['wh']
-        estimate=delta*3600/dt
-        s['energy_sample']={'wh':wh,'at':now,'onroad':onroad}
-        s['vehicle']['charge_power_w']=round(estimate) if 300<=estimate<=250000 else 0
-        if not 300<=estimate<=250000:
-            s.pop('charge_candidate',None)
-            if estimate>250000 and s.get('charge'):s['charge']['partial']=True
-            return
-        window={'started_at':prev['at'],'ended_at':now,'delta':delta,'dt':dt,'power':estimate,
-                'start_wh':prev['wh'],'end_wh':wh}
-        if s.get('charge'):
-            windows=[window]
-        else:
-            candidate=s.get('charge_candidate')
-            windows=candidate['windows']+[window] if candidate and candidate['ended_at']==prev['at'] else [window]
-            s['charge_candidate']={'windows':windows,'ended_at':now}
-            if delta<100 and not (len(windows)>=2 and sum(w['delta'] for w in windows)>=50):
-                return
-            s['charge']={'id':str(uuid.uuid4()),'started_at':stamp(windows[0]['started_at']),
-                         'energy_kwh':0,'duration_s':0,'partial':False}
-            s.pop('charge_candidate',None)
-        charge=s['charge']
-        # Track only this session's contributions so a later fast window can
-        # reclassify its startup energy without moving unrelated AC sessions.
-        charge.setdefault('month_energy', {})
-        charge.setdefault('peak_wh', windows[0]['start_wh'])
-        if any(w['power']>11000 for w in windows) and not charge.get('fast'):
-            for month, kwh in charge['month_energy'].items():
-                ledger=s['charge_months'][month]
-                ledger['slow_kwh']=max(0, ledger['slow_kwh']-kwh)
-                ledger['fast_kwh']+=kwh
-                ledger['cost_krw']+=kwh*(320-280)
-            charge['fast']=True
-        kind='fast' if charge.get('fast') else 'slow'
-        accepted=False
-        for w in windows:
-            # A dip then rebound to an already counted BMS value is not new
-            # charge. The peak persists through restart and zero-power windows.
-            added=max(0, w['end_wh']-charge['peak_wh'])
-            # The CAN signals are quantized in 25/50 Wh steps. Do not
-            # confirm a lone 25 Wh tail fluctuation; retain the counted
-            # peak so genuine smaller increases can accumulate to 50 Wh.
-            if added < 50:
-                continue
-            charge['peak_wh']=w['end_wh']
-            accepted=True
-            month=datetime.fromtimestamp(w['ended_at'],timezone(timedelta(hours=9))).strftime('%Y-%m')
-            ledger=s['charge_months'].setdefault(month,{'slow_kwh':0,'fast_kwh':0,'cost_krw':0})
-            kwh=added/1000
-            ledger[kind+'_kwh']+=kwh
-            ledger['cost_krw']+=kwh*(280 if kind=='slow' else 320)
-            charge['month_energy'][month]=charge['month_energy'].get(month,0)+kwh
-            charge['energy_kwh']+=kwh
-            charge['duration_s']+=w['dt']
-        if not accepted:
-            return
-        s['charge']['ended_at']=stamp(now)
-        s['last_charge_increase']=now

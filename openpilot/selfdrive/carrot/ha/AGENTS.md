@@ -1,5 +1,17 @@
 # Carrot HA daemon performance contract — 2026-10-01
 
+## Passive CAN charging evidence — 2026-10-05
+
+Before changing charging decoding, read the companion carrot-ha repository's
+`docs/can-analysis-index.md` and `docs/raw-can-charge-analysis-2026-10-05.md`.
+Record new analyses as dated reports and update that index. HVK_01 (0x503),
+HVK_BMS_Sollmodus is a request, not proof of connector state or measured current.
+Code 6 matched one DC session; AC code 4 remains DBC-based, not vehicle-tested.
+Energy changes calculate kWh but must not create a charging session. Preserve
+freshness checks, explicit noncharging/driving boundaries and bounded same-mode
+gap reconstruction. Unknown time is separate from confirmed charging duration.
+Raw capture remains passive and uses separate bounded storage, not control CAN TX.
+
 This daemon belongs to helico717/openpilot, branch carrot-wip-model_selector-ha.
 The user's two-repository instructions take precedence over unrelated top-level
 branch-consolidation history. HA/Worker/card changes belong to helico717/carrot-ha.

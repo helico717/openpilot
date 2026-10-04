@@ -13,8 +13,8 @@ class ChargeClassificationTests(unittest.TestCase):
         self.store=engine.Store(Path(self.tmp.name)/'state.sqlite3')
         self.e=engine.Engine(self.store,'car')
         self.base=datetime(2026,10,2,tzinfo=timezone.utc).timestamp()
-    def sample(self,t,wh):
-        self.e._sample_energy(self.base+t,False,wh)
+    def sample(self,t,wh,code=6):
+        self.e.tick(self.base+t,False,sampled={'battery_wh':wh,'charge_can_bms_request_bus1':code},motion={'gear':'park','speed_mps':0})
     def ledger(self):
         return self.e.s['charge_months']['2026-10']
     def test_fast_promotion_includes_slow_startup_but_not_other_ac_session(self):
@@ -28,11 +28,11 @@ class ChargeClassificationTests(unittest.TestCase):
         for t,wh in [(0,30000),(90,32000),(180,32025),(270,32000),(360,32025)]:self.sample(t,wh)
         self.assertAlmostEqual(self.ledger()['fast_kwh'],2)
         self.assertEqual(self.ledger()['slow_kwh'],0)
-        self.assertEqual(self.e.s['last_charge_increase'],self.base+90)
+        self.assertEqual(self.e.s['charge']['peak_wh'],32000)
         self.sample(450,32100)
         self.assertAlmostEqual(self.ledger()['fast_kwh'],2.1)
     def test_actual_ac_remains_slow(self):
-        for t,wh in [(0,30000),(90,30150),(180,30300)]:self.sample(t,wh)
+        for t,wh in [(0,30000),(90,30150),(180,30300)]:self.sample(t,wh,4)
         self.assertAlmostEqual(self.ledger()['slow_kwh'],.3)
         self.assertEqual(self.ledger()['fast_kwh'],0)
     def test_fast_latch_and_peak_survive_restart(self):
@@ -57,20 +57,22 @@ class ChargeClassificationTests(unittest.TestCase):
         self.e=engine.Engine(self.store,'car')
         self.assertNotIn('charge_candidate',self.e.s)
         self.assertEqual(self.ledger()['slow_kwh'],.1)
-    def test_legacy_active_charge_can_continue(self):
+    def test_legacy_active_charge_is_preserved_as_partial_then_can_session_starts(self):
         self.e.s.update(charge={'id':'old','energy_kwh':1,'duration_s':90,'partial':True},
             energy_sample={'wh':30000,'at':self.base,'onroad':False})
         self.sample(90,32000)
-        self.assertEqual(self.ledger()['fast_kwh'],2)
-        self.assertEqual(self.e.s['charge']['energy_kwh'],3)
+        self.assertEqual(self.e.s['charge_sessions'][0]['energy_kwh'],1)
+        self.assertTrue(self.e.s['charge_sessions'][0]['partial'])
+        self.assertEqual(self.e.s['charge']['source'],'can_request')
+        self.assertEqual(self.e.s['charge']['energy_kwh'],0)
 
     def test_quantized_tail_oscillation_does_not_add_charge(self):
         for t,wh in [(0,30000),(90,32000),(180,32025),(270,32000),
                      (360,32025),(450,32025)]:self.sample(t,wh)
         self.assertEqual(self.ledger()['fast_kwh'],2)
         self.assertEqual(self.ledger()['slow_kwh'],0)
-        self.assertEqual(self.e.s['last_charge_increase'],self.base+90)
+        self.assertEqual(self.e.s['charge']['peak_wh'],32000)
 
     def test_small_real_increases_accumulate_before_confirmation(self):
-        for t,wh in [(0,30000),(90,30100),(180,30125),(270,30150)]:self.sample(t,wh)
+        for t,wh in [(0,30000),(90,30100),(180,30125),(270,30150)]:self.sample(t,wh,4)
         self.assertAlmostEqual(self.ledger()['slow_kwh'],.15)
