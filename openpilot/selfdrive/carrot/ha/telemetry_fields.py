@@ -1,7 +1,7 @@
 """Passive optional telemetry. No CAN writes, Params writes or extra threads."""
 import math
 
-OPTIONAL_MESSAGES = ('ZV_02', 'Licht_Anf_01', 'DCDC_03')
+OPTIONAL_MESSAGES = ('ZV_02', 'Licht_Anf_01', 'DCDC_03', 'WBA_03', 'Motor_26', 'Motor_Hybrid_06', 'HVK_01')
 DOORS = {
     'door_driver_open': 'ZV_FT_offen', 'door_passenger_open': 'ZV_BT_offen',
     'door_rear_driver_open': 'ZV_HFS_offen', 'door_rear_passenger_open': 'ZV_HBFS_offen',
@@ -21,13 +21,28 @@ BMS_MODES = {0: 'hv_inactive', 1: 'driving_hv_active', 2: 'balancing',
              3: 'external_charging', 4: 'ac_charging', 5: 'battery_error', 6: 'dc_charging'}
 
 
-def decode_optional(vl_all):
+# Raw diagnostic candidates only. Display text/request modes are NOT a
+# validated plug connection signal. Preserve each bus separately for comparison.
+CHARGE_CAN_SIGNALS = {
+    'plug_text': ('WBA_03', 'WBA_GE_Texte_02', 7),
+    'motor_text': ('Motor_26', 'MO_E_Texte', 15),
+    'activation_text': ('Motor_Hybrid_06', 'MO_Text_Aktivierung_Antrieb', 15),
+    'bms_request': ('HVK_01', 'HVK_BMS_Sollmodus', 7),
+    'manager_request': ('HVK_01', 'HVK_HVLM_Sollmodus', 7),
+}
+
+def decode_optional(vl_all, bus=None):
     """Only decode samples actually received; zero is a valid closed/off value."""
     def last(message, signal):
         samples = vl_all.get(message, {}).get(signal, [])
         return samples[-1] if samples else None
 
     result = {}
+    if bus in (0, 1):
+        for name, (message, signal, maximum) in CHARGE_CAN_SIGNALS.items():
+            value = last(message, signal)
+            if type(value) in (int, float) and math.isfinite(value) and value == int(value) and 0 <= value <= maximum:
+                result[f'charge_can_{name}_bus{bus}'] = int(value)
     for message, fields in (('ZV_02', DOORS), ('Licht_Anf_01', LIGHTS)):
         for key, signal in fields.items():
             value = last(message, signal)

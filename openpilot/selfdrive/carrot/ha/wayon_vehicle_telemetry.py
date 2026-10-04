@@ -272,14 +272,14 @@ def sample_vehicle_can(timeout_s: float = 6.0) -> dict:
         result["recirc"] = int(cp.vl["Klima_12"]["KL_Umluftklappe_Status"])
 
       try:
-        result.update(decode_optional(cp.vl_all))
+        result.update(decode_optional(cp.vl_all, bus=cp.bus))
       except Exception:
         pass
 
     for optional_cp in _OPTIONAL_PARSERS:
       try:
         optional_cp.update(frames)
-        result.update(decode_optional(optional_cp.vl_all))
+        result.update(decode_optional(optional_cp.vl_all, bus=optional_cp.bus))
       except Exception:
         continue
 
