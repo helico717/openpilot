@@ -146,6 +146,23 @@ def main():
                 time.sleep(delay)
                 delay = min(120, delay * 2)
 
+    # Temporary raw CAN analysis uses HA files, not the normal telemetry outbox.
+    try:
+        from .can_capture import start_capture_thread
+    except (ImportError, ValueError):
+        from can_capture import start_capture_thread
+    def capture_context():
+        values = dict(engine.s.get('vehicle', {}))
+        keys = {'battery_wh', 'charging', 'charge_power_w', 'driving', 'comma_onroad', 'gear', 'wheel_speed_mps'}
+        return {'observed_at': time.time(), 'onroad': engine.s.get('onroad'),
+                'values': {key: value for key, value in values.items() if key in keys or key.startswith('charge_can_')},
+                'field_measured_at': {key: value for key, value in dict(engine.s.get('field_measured_at', {})).items()
+                                     if key in keys or key.startswith('charge_can_')}}
+    try:
+        start_capture_thread(config, DATA_DIR, capture_context)
+    except Exception as error:
+        print("CAN capture start error:", type(error).__name__, flush=True)
+
     threading.Thread(target=sample, daemon=True).start()
     threading.Thread(target=upload, daemon=True).start()
 
