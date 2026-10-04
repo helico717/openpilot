@@ -200,7 +200,25 @@ class Engine:
             if onroad is False:s['parking']=dict(gps,measured_at=stamp(now))
         s['onroad']=onroad
         if sampled is not None:
+            try:
+                from .telemetry_fields import BATTERY_MONITOR_KEYS
+            except (ImportError, ValueError):
+                from openpilot.selfdrive.carrot.ha.telemetry_fields import BATTERY_MONITOR_KEYS
+            received = sampled.get('_battery_can_measured_at') or {}
             for key,value in sampled.items():
+                if key == '_battery_can_measured_at':
+                    continue
+                if key in BATTERY_MONITOR_KEYS:
+                    measured = received.get(key)
+                    if type(measured) not in (int, float) or not math.isfinite(measured) or not 0 <= now-measured <= 180:
+                        continue
+                    previous = s['field_measured_at'].get(key)
+                    if previous and datetime.fromisoformat(previous).timestamp() > measured:
+                        continue
+                    if value is None or not isinstance(value, float) or math.isfinite(value):
+                        s['vehicle'][key] = value
+                        s['field_measured_at'][key] = stamp(measured)
+                    continue
                 if (value is not None and (not isinstance(value,float) or math.isfinite(value))) or (value is None and key in ('bms_target_soc_percent', 'dcdc_temperature_c')):
                     s['vehicle'][key]=value;s['field_measured_at'][key]=stamp(now)
             if sampled:s['measured_at']=stamp(now)

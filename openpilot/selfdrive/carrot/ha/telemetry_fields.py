@@ -99,3 +99,42 @@ def decode_battery_energy(vl_all):
             if type(value) in (int,float) and math.isfinite(value) and 0 < value <= maximum:
                 return float(value)
     return None
+
+
+BATTERY_MONITOR_KEYS = {
+    'battery_min_temperature_c', 'battery_max_temperature_c',
+    'battery_cell_min_voltage_v', 'battery_cell_max_voltage_v',
+    'battery_cell_voltage_delta_mv', 'battery_charge_temperature_status',
+}
+CHARGE_TEMPERATURE_STATES = {1: 'below_optimal', 2: 'optimal', 3: 'above_optimal'}
+
+def decode_battery_monitoring(address, payload):
+    """Passive MEB observations; do not affect SOC or charging decisions.
+
+    Definitions/vehicle evidence: carrot-ha/docs/raw-can-full-audit-2026-10-05.md.
+    Initialisation codes must clear an existing value, not refresh it.
+    Cell extrema and their difference always come from the same frame.
+    """
+    if address not in (0x16A954A6, 0x1A5555B2) or len(payload) != 8:
+        return {}
+    b = payload
+    if address == 0x1A5555B2:
+        code = (int.from_bytes(b, 'little') >> 15) & 7
+        return {'battery_charge_temperature_status': CHARGE_TEMPERATURE_STATES.get(code)}
+    low = b[4] * .5 - 40 if b[4] < 254 else None
+    high = b[3] * .5 - 40 if b[3] < 254 else None
+    if low is not None and high is not None and low > high:
+        low = high = None
+    max_raw = ((b[6] & 15) << 8) | b[5]
+    min_raw = (b[7] << 4) | (b[6] >> 4)
+    # Startup has invalid extrema together with the temperature sentinels.
+    minimum = min_raw + 1000 if min_raw < 4094 and b[3] < 254 and b[4] < 254 else None
+    maximum = max_raw + 1000 if max_raw < 4094 and b[3] < 254 and b[4] < 254 else None
+    if minimum is not None and maximum is not None and minimum > maximum:
+        minimum = maximum = None
+    return {
+        'battery_min_temperature_c': low, 'battery_max_temperature_c': high,
+        'battery_cell_min_voltage_v': minimum / 1000 if minimum is not None else None,
+        'battery_cell_max_voltage_v': maximum / 1000 if maximum is not None else None,
+        'battery_cell_voltage_delta_mv': maximum - minimum if maximum is not None and minimum is not None else None,
+    }
