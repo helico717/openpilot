@@ -42,7 +42,7 @@ def add_energy(state, charge, wh, at, corrected=False):
 def update(state, now, signal, wh=None):
     valid=valid_energy(wh)
     charge=state.get('charge');active=signal['charging']
-    if charge and charge.get('source')!='can_request':
+    if charge and charge.get('source') not in ('can_request', 'can_actual'):
         finish(state,True);charge=None
     if active is None:
         if charge:
@@ -75,7 +75,7 @@ def update(state, now, signal, wh=None):
         use_anchor=valid and anchor and 0<=now-anchor['at']<=45 and anchor['wh']<=wh
         baseline=anchor['wh'] if use_anchor else wh if valid else None
         energy_at=anchor['at'] if use_anchor else mode_at
-        charge=state['charge']={'id':str(uuid.uuid4()),'source':'can_request','can_mode':code,
+        charge=state['charge']={'id':str(uuid.uuid4()),'source':'can_actual' if signal.get('source_kind') == 'actual' else 'can_request','can_mode':code,
             'started_at':stamp(mode_at),'ended_at':stamp(mode_at),'energy_kwh':0,'duration_s':0,
             'confirmed_duration_s':0,'unknown_duration_s':0,'gap_corrected':False,'gap_count':0,
             'corrected_energy_kwh':0,'signal_gaps':[],'partial':baseline is None,'fast':code==6,'peak_wh':baseline,

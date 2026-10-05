@@ -22,9 +22,9 @@ import requests
 from openpilot.cereal import messaging
 from openpilot.common.params import Params
 try:
-    from .telemetry_fields import OPTIONAL_MESSAGES, decode_optional, decode_battery_energy, decode_battery_monitoring
+    from .telemetry_fields import OPTIONAL_MESSAGES, decode_optional, decode_battery_energy, decode_battery_monitoring, decode_bms_actual
 except (ImportError, ValueError):
-    from telemetry_fields import OPTIONAL_MESSAGES, decode_optional, decode_battery_energy, decode_battery_monitoring
+    from telemetry_fields import OPTIONAL_MESSAGES, decode_optional, decode_battery_energy, decode_battery_monitoring, decode_bms_actual
 
 CONFIG_PATH = Path(os.getenv("WAYON_CLOUD_CONFIG", "/data/wayon_cloud/config.json"))
 STATE_PATH = Path(os.getenv("WAYON_VEHICLE_STATE", "/data/wayon_cloud/vehicle_state.json"))
@@ -236,9 +236,9 @@ def sample_vehicle_can(timeout_s: float = 6.0) -> dict:
     for packet_ns, packet_frames in frames:
       observed = unix_offset + packet_ns / 1e9
       for address, payload, bus in packet_frames:
-        if bus not in (0, 1) or address not in (0x16A954A6, 0x1A5555B2):
+        if bus not in (0, 1) or address not in (0x16A954A6, 0x1A5555B2, 0xCF):
           continue
-        decoded = decode_battery_monitoring(address, payload)
+        decoded = decode_bms_actual(payload, bus) if address == 0xCF else decode_battery_monitoring(address, payload)
         if decoded:
           times = result.setdefault('_battery_can_measured_at', {})
           for key, value in decoded.items():

@@ -138,3 +138,20 @@ def decode_battery_monitoring(address, payload):
         'battery_cell_max_voltage_v': maximum / 1000 if maximum is not None else None,
         'battery_cell_voltage_delta_mv': maximum - minimum if maximum is not None and minimum is not None else None,
     }
+
+
+BMS_ACTUAL_KEYS = {f'bms_{field}_bus{bus}' for field in ('actual_mode', 'power_w', 'voltage_v') for bus in (0, 1)}
+BATTERY_MONITOR_KEYS.update(BMS_ACTUAL_KEYS)
+
+def decode_bms_actual(payload, bus):
+    """Receive-only 0xCF, AC/DC field-tested 2026-10-05. Positive is charging."""
+    if len(payload) != 8 or bus not in (0, 1):
+        return {}
+    b = payload
+    mode = b[2] & 7
+    current = ((((b[4] & 127) << 8) | b[3]) - 16300) * .1
+    voltage = ((b[7] << 4) | (b[6] >> 4)) * .25
+    valid = mode != 7 and 100 <= voltage <= 800 and abs(current) <= 1000
+    return {f'bms_actual_mode_bus{bus}': mode,
+            f'bms_power_w_bus{bus}': round(current * voltage, 2) if valid else None,
+            f'bms_voltage_v_bus{bus}': voltage if valid else None}

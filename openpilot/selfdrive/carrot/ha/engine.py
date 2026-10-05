@@ -223,10 +223,10 @@ class Engine:
                     s['vehicle'][key]=value;s['field_measured_at'][key]=stamp(now)
             if sampled:s['measured_at']=stamp(now)
         try:
-            from .charging_mode import charging_mode
+            from .charging_mode import charging_mode, actual_power_voltage
             from .charge_recorder import update as update_can_charge
         except (ImportError, ValueError):
-            from openpilot.selfdrive.carrot.ha.charging_mode import charging_mode
+            from openpilot.selfdrive.carrot.ha.charging_mode import charging_mode, actual_power_voltage
             from openpilot.selfdrive.carrot.ha.charge_recorder import update as update_can_charge
         signal=charging_mode({**s['vehicle'], 'field_measured_at':s['field_measured_at']},now)
         previous_charging=s['vehicle'].get('charging')
@@ -234,17 +234,12 @@ class Engine:
         update_can_charge(s,now,signal,sampled.get('battery_wh') if sampled else None)
         s.pop('charge_candidate',None)
         s['vehicle'].update(charging=signal['charging'],charge_mode=signal['mode'],
-                            charge_state_source='can_request')
-        if signal['charging'] is not True:
-            s['vehicle']['charge_power_w']=0 if signal['charging'] is False else None
-            s.pop('can_power_sample',None)
-        elif sampled and sampled.get('battery_wh') is not None:
-            previous=s.get('can_power_sample')
-            wh=sampled['battery_wh']
-            if previous and 0<now-previous['at']<=90:
-                power=(wh-previous['wh'])*3600/(now-previous['at'])
-                s['vehicle']['charge_power_w']=round(power) if 0<=power<=250000 else None
-            s['can_power_sample']={'wh':wh,'at':now}
+                            charge_state_source='can_actual' if signal['source_kind']=='actual' else 'can_request')
+        power, voltage, measured = actual_power_voltage(s['vehicle'] | {'field_measured_at':s['field_measured_at']}, signal)
+        s['vehicle'].update(charge_power_w=power, hv_voltage=voltage)
+        s.pop('can_power_sample', None)
+        if measured:
+            s['field_measured_at'].update(charge_power_w=measured, hv_voltage=measured)
         changed=changed or previous_charging!=signal['charging'] or previous_mode!=signal['mode']
         interval=30 if onroad else 60
         if changed or now-s.get('last_upload',0)>=interval:
