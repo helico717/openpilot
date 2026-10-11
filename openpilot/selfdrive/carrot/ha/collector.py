@@ -96,6 +96,11 @@ def main():
         while True:
             try:
                 values = reference.sample_vehicle_can(timeout_s=4)
+                try:
+                    from .git_status import checkout_status
+                except ImportError:
+                    from git_status import checkout_status
+                values.update(checkout_status())
                 with sample_lock:
                     latest_sample = values
                     sample_version += 1
