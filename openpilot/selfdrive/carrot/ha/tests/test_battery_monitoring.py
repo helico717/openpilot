@@ -12,6 +12,14 @@ fields = load('battery_fields', 'telemetry_fields.py')
 engine = load('battery_engine', 'engine.py')
 
 class BatteryMonitoringTests(unittest.TestCase):
+    def test_representative_temperature_and_invalid_clearing(self):
+        key = 'battery_temperature_c'
+        self.assertIn(key, fields.BATTERY_MONITOR_KEYS)
+        for raw, expected in ((0,-40), (151,35.5), (253,86.5), (254,None), (255,None)):
+            payload = bytearray(8); payload[5] = raw
+            self.assertEqual(fields.decode_battery_monitoring(0x1A555551, payload), {key:expected})
+        self.assertEqual(fields.decode_battery_monitoring(0x1A555551, b'\0'*7), {})
+
     def test_recorded_frame_extrema_and_same_frame_delta(self):
         result = fields.decode_battery_monitoring(0x16A954A6, bytes.fromhex('ec06229590558bb4'))
         self.assertEqual(result['battery_max_temperature_c'], 34.5)
@@ -34,7 +42,7 @@ class BatteryMonitoringTests(unittest.TestCase):
 
     def test_timestamps_invalid_clearing_and_old_response_rejection(self):
         with tempfile.TemporaryDirectory() as d:
-            store=engine.Store(Path(d)/'state.db');e=engine.Engine(store,'test');k='battery_max_temperature_c';now=1800000000
+            store=engine.Store(Path(d)/'state.db');e=engine.Engine(store,'test');k='battery_temperature_c';now=1800000000
             def sample(v,t):return {k:v,'_battery_can_measured_at':{k:t}}
             e.tick(now,False,sampled=sample(35,now-4))
             self.assertEqual(e.s['field_measured_at'][k],engine.stamp(now-4))

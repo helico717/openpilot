@@ -236,8 +236,10 @@ def sample_vehicle_can(timeout_s: float = 6.0) -> dict:
     for packet_ns, packet_frames in frames:
       observed = unix_offset + packet_ns / 1e9
       for address, payload, bus in packet_frames:
-        if bus not in (0, 1) or address not in (0x16A954A6, 0x1A5555B2, 0xCF):
+        if bus not in (0, 1) or address not in (0x16A954A6, 0x1A5555B2, 0x1A555551, 0xCF):
           continue
+        if address == 0x1A555551 and bus != 1:
+          continue  # Only physical bus1 was validated for this new signal.
         decoded = decode_bms_actual(payload, bus) if address == 0xCF else decode_battery_monitoring(address, payload)
         if decoded:
           times = result.setdefault('_battery_can_measured_at', {})

@@ -102,6 +102,7 @@ def decode_battery_energy(vl_all):
 
 
 BATTERY_MONITOR_KEYS = {
+    'battery_temperature_c',
     'battery_min_temperature_c', 'battery_max_temperature_c',
     'battery_cell_min_voltage_v', 'battery_cell_max_voltage_v',
     'battery_cell_voltage_delta_mv', 'battery_charge_temperature_status',
@@ -115,9 +116,13 @@ def decode_battery_monitoring(address, payload):
     Initialisation codes must clear an existing value, not refresh it.
     Cell extrema and their difference always come from the same frame.
     """
-    if address not in (0x16A954A6, 0x1A5555B2) or len(payload) != 8:
+    if address not in (0x16A954A6, 0x1A5555B2, 0x1A555551) or len(payload) != 8:
         return {}
     b = payload
+    if address == 0x1A555551:
+        # BMS_25 representative temperature, not an average of cell extrema.
+        # Full retained CAN audit 2026-10-11: byte5, 0.5 C/bit, offset -40.
+        return {'battery_temperature_c': b[5] * .5 - 40 if b[5] < 254 else None}
     if address == 0x1A5555B2:
         code = (int.from_bytes(b, 'little') >> 15) & 7
         return {'battery_charge_temperature_status': CHARGE_TEMPERATURE_STATES.get(code)}
