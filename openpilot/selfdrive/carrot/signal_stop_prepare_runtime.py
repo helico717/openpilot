@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 
 from openpilot.selfdrive.carrot.signal_assist_runtime import SignalAssistRuntime, requested, MAX_BYTES
-from openpilot.selfdrive.carrot.signal_stop_prepare import SignalStopPrepare, housing_range
+from openpilot.selfdrive.carrot.signal_stop_prepare import SignalStopPrepare, housing_range, housing_alignment, night_lamp_support
 
 ENABLE_PATH = Path('/data/signal-color-shadow/stop_prepare_enabled')
 OBSERVATION_PATH = Path('/dev/shm/carrot_signal_prepare_observation.json')
@@ -31,19 +31,29 @@ def publish_prepare_observation(record, directory=ENABLE_PATH.parent, path=OBSER
 class SignalPrepareRuntime(SignalAssistRuntime):
   def __init__(self):
     super().__init__(ENABLE_PATH, OBSERVATION_PATH)
-    self.prepare = SignalStopPrepare() if self.enabled else None
+    self.prepare = SignalStopPrepare()
     self.extra = None
     self.last_prepare_log = None
-    if self.prepare is not None:
-      from openpilot.cereal import messaging
-      self.extra = messaging.SubMaster(['liveCalibration', 'roadCameraState', 'deviceState'])
+    self.mode = None
+    self.mode_since = -math.inf
 
   def read(self, sm, now=None):
     obs, context = super().read(sm, now)
-    context.update(geometry=lambda box: None, turning=True)
-    if not self.enabled or self.extra is None:
+    from openpilot.selfdrive.carrot.signal_mode import signal_mode
+    mode = signal_mode()
+    if mode != getattr(self, 'mode', None):
+      self.mode, self.mode_since = mode, context['now']
+      self.prepare.reset('mode_change')
+    context['actuate'] = mode == 2
+    if obs is not None and obs.get('timestamp', -math.inf) < self.mode_since:
+      obs = None
+    context.update(geometry=lambda box: None, alignment=None, night_geometry=None, turning=True)
+    if not self.enabled:
       context['valid'] = False
       return obs, context
+    if self.extra is None:
+      from openpilot.cereal import messaging
+      self.extra = messaging.SubMaster(['liveCalibration', 'roadCameraState', 'deviceState'])
     try:
       from openpilot.common.transformations.camera import DEVICE_CAMERAS
       from openpilot.common.transformations.orientation import rot_from_euler
@@ -78,12 +88,21 @@ class SignalPrepareRuntime(SignalAssistRuntime):
       context['geometry'] = lambda box: housing_range(
         box, config.fcam.focal_length, rpy, model.roadEdges, model.roadEdgeStds,
         model.laneLines, model.laneLineProbs, model.laneLineStds)
+      context['alignment'] = lambda box, distance: housing_alignment(
+        box, distance, config.fcam.focal_length, rpy, model.roadEdges, model.roadEdgeStds,
+        model.laneLines, model.laneLineProbs, model.laneLineStds)
+      context['night_geometry'] = lambda box: night_lamp_support(
+        box, config.fcam.focal_length, rpy, model.roadEdges, model.roadEdgeStds,
+        model.laneLines, model.laneLineProbs, model.laneLineStds)
     except (AttributeError, KeyError, TypeError, ValueError, IndexError):
       context['valid'] = False
     return obs, context
 
   def record_prepare(self, decision):
+    if not self.enabled and self.last_prepare_log is None:
+      return
     value = asdict(decision)
+    value.update(mode=self.mode, control_active=decision.active and self.mode == 2)
     if value != self.last_prepare_log:
       from openpilot.common.swaglog import cloudlog
       cloudlog.event('signalStopPrepare', **value)

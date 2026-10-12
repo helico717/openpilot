@@ -33,6 +33,38 @@ def dark_scene(rgb):
   return lower + (upper - lower) * (rank - math.floor(rank)) <= 45
 
 
+def illuminated_green(rgb, box):
+  """Require a compact green/cyan light inside the right lamp, not sky at a rim.
+
+  This verifies current pixels only. A dark lamp never supplies a green vote;
+  retained red history and template correspondence cannot substitute for light.
+  Housing layout is still a hypothesis, not signal-to-lane or arrow recognition.
+  """
+  x1, y1, x2, y2 = map(int, box)
+  patch = rgb[y1:y2, x1:x2]
+  if patch.size == 0:
+    return False
+  h, w = patch.shape[:2]
+  r, g, b = np.moveaxis(patch.astype(np.int16), -1, 0)
+  yy, xx = np.mgrid[:h, :w]
+  interior = (xx >= .70*w) & (xx < .97*w) & (yy >= .18*h) & (yy < .82*h)
+  # Weakly saturated blue sky can be locally bright too. Cyan LEDs may have
+  # slightly more blue than green, but then require a strong chromatic core.
+  color = (g >= 70) & (g-r >= 30) & (g >= .9*b) & ((g >= .98*b) | (g-r >= 60))
+  count, ids, stats, _ = cv2.connectedComponentsWithStats((interior & color).astype(np.uint8), 8)
+  for k in range(1, count):
+    x, y, cw, ch, area = stats[k]
+    if area < 2 or not .4 <= cw/max(1, ch) <= 2.5:
+      continue
+    component = ids == k
+    # Compare with the unlit housing, excluding the sky outside its boundary.
+    housing = (xx >= .35*w) & (xx < .70*w) & (yy >= .18*h) & (yy < .82*h)
+    if (housing.any() and small_percentile(g[component], 80)-float(np.median(g[housing])) >= 18
+        and small_percentile((g-r)[component], 80)-float(np.median((g-r)[housing])) >= 12):
+      return True
+  return False
+
+
 def lamp_evidence(rgb, box, *, conservative_green=False):
   x1, y1, x2, y2 = map(int, box)
   a = rgb[y1:y2, x1:x2]
@@ -305,12 +337,13 @@ class SignalTracker:
   MAX_IDENTITY_GAP = .5
   MAX_VISIBLE_AGE = .125
 
-  def __init__(self, *, daytime_cores=False, robust_tracking=False, conservative_green=False):
+  def __init__(self, *, daytime_cores=False, robust_tracking=False, conservative_green=False, verified_lamps=False):
     # Opt-ins keep the default observer unchanged. Color confirmation and final
     # freshness remain independent from image-supported identity retention.
     self.daytime_cores = daytime_cores
     self.robust_tracking = robust_tracking
     self.conservative_green = conservative_green
+    self.verified_lamps = verified_lamps
     self.identity_gap = self.MAX_IDENTITY_GAP if robust_tracking else self.MAX_OBSERVATION_GAP
     self.tracks = []
     self.next_id = 1
@@ -322,10 +355,13 @@ class SignalTracker:
       self.tracks = []
     if self.last_timestamp is not None and timestamp-self.last_timestamp > self.MAX_OBSERVATION_GAP:
       for t in self.tracks:
+        if self.verified_lamps and t.pending == 'red':
+          continue  # Fresh matching red may accumulate at the bounded identity cadence.
         t.state = t.pending = 'unknown'
         t.pending_count = 0
     self.last_timestamp = timestamp
-    self.tracks = [t for t in self.tracks if timestamp-t.last_seen <= (self.identity_gap if t.seen_red else self.MAX_OBSERVATION_GAP)]
+    self.tracks = [t for t in self.tracks if timestamp-t.last_seen <= (
+      self.identity_gap if t.seen_red or (self.verified_lamps and t.pending == 'red') else self.MAX_OBSERVATION_GAP)]
     used = set()
     for d in detections:
       candidates = []
@@ -345,7 +381,10 @@ class SignalTracker:
                    distance <= max(2., aw*.15) and overlap(a,b) >= .6)):
             continue
         limit = max(10, aw//5)+1 if d.get('continuity_id') == t.ident else max(6, aw*.3)
-        if .65 <= bw/aw <= 1.55 and .5 <= bh/ah <= 2 and distance < limit and overlap(a,b) > .12:
+        red_motion = (self.verified_lamps and d.get('continuity_id') == t.ident
+                      and d.get('red_motion_verified', False) and d['raw'] == t.pending == 'red'
+                      and d.get('match_score', 0) >= .9 and timestamp-t.last_seen <= self.MAX_OBSERVATION_GAP)
+        if .65 <= bw/aw <= 1.55 and .5 <= bh/ah <= 2 and distance < limit and (overlap(a,b) > .12 or red_motion):
           candidates.append((distance, t))
       if len(candidates) > 1 and any(timestamp-t.last_seen > self.MAX_OBSERVATION_GAP for _,t in candidates):
         candidates = []
@@ -359,16 +398,17 @@ class SignalTracker:
       gap = timestamp-t.last_seen
       t.box = d['box'];t.last_seen = timestamp;t.observations += 1;t.evidence = d
       raw = d['raw']
+      confirmation_gap = self.identity_gap if self.verified_lamps and raw == 'red' else self.MAX_OBSERVATION_GAP
       if raw == 'unknown':
         t.pending = 'unknown'
         t.pending_count = 0
         if timestamp-t.last_support > .15:
           t.state = 'unknown'
-      elif raw != t.pending or gap > self.MAX_OBSERVATION_GAP:
+      elif raw != t.pending or gap > confirmation_gap:
         t.pending = raw;t.pending_since = timestamp
         t.pending_count = 1
         # A contradictory observation removes an earlier green immediately.
-        if raw != t.state or gap > self.MAX_OBSERVATION_GAP:
+        if raw != t.state or gap > confirmation_gap:
           t.state = 'unknown'
       else:
         t.pending_count += 1
@@ -399,7 +439,9 @@ class SignalTracker:
       for track in self.tracks:
         # The template must belong to the immediately preceding image. An old
         # box alone cannot identify the object in that intervening image.
-        if not track.seen_red or track.last_seen != self.last_timestamp:
+        pending_red = (self.verified_lamps and track.pending == 'red' and track.observations >= 2
+                       and track.evidence.get('source') == 'night_lamp_core')
+        if (not track.seen_red and not pending_red) or track.last_seen != self.last_timestamp:
           continue
         if not bridge and any(overlap(track.box,d['box']) > .25 for d in detections):
           continue
@@ -425,12 +467,23 @@ class SignalTracker:
           continue
         dx=sx+loc[0]-ax;dy=sy+loc[1]-ay;box=[x1+dx,y1+dy,x2+dx,y2+dy]
         raw,strength,evidence=lamp_evidence(rgb,box,conservative_green=self.conservative_green)
+        red_motion = False
+        if (self.verified_lamps and not bridge and raw == track.pending == 'red' and score >= .9
+            and track.evidence.get('source') == 'night_lamp_core'):
+          # A small lamp can move farther than its height after a road bump.
+          # Require an isolated image-match peak; nearby identical lamps must
+          # not exchange identities. Only current red evidence uses this path.
+          alternatives = scores.copy()
+          lx, ly = loc
+          alternatives[max(0,ly-2):ly+3, max(0,lx-2):lx+3] = -1
+          red_motion = score-float(alternatives.max()) >= .05
         if bridge:
           # Image correspondence keeps identity, never a previous color streak.
           # The current image must independently contain the same lamp housing.
           detections = [d for d in detections if overlap(box,d['box']) <= .35]
         detections.append(dict(box=box,raw=raw,quality=strength,source='causal_template',match_score=score,
-                               **({'continuity_id':track.ident} if bridge else {}),**evidence))
+                               **({'continuity_id':track.ident} if bridge or red_motion else {}),
+                               **({'red_motion_verified': True} if red_motion else {}),**evidence))
     if not allow_green:
       # Offline steering experiment: preserve red acquisition/history, but never
       # grant a green vote or retain a confirmed green through rejected input.
@@ -444,5 +497,10 @@ class SignalTracker:
         if track.pending == 'green':
           track.pending = 'unknown'
           track.pending_count = 0
+    if self.verified_lamps:
+      for detection in detections:
+        if detection['raw'] == 'green' and not illuminated_green(rgb, detection['box']):
+          detection['raw'] = 'unknown'
+          detection['green_rejected'] = 'unlit_or_border'
     self.previous_gray=gray
     return self.update(timestamp,detections)

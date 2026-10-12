@@ -21,6 +21,79 @@ successful Actions runs, and never report desktop test failures as device faults
 
 # Repository memory
 
+- On 2026-10-12, 10a5 on nav ac1da01591/mode2 reproduces a real green held by
+  a tiny sole red anchor and zero moving preparation after small night lamps
+  repeatedly lose IDs. Add a two-housing red-to-green release: each anchor needs
+  independent red history and fresh 700ms green, with no forward red conflict.
+  Night-only pending-red templates and unique >=0.9 image correspondence retain
+  small red identity through bounded motion; do not relax green/daytime rules.
+  512 tests pass; prior 43,090-frame guard summaries match at nominal/+20ms;
+  3,347 prior image comparisons have unchanged fresh colors/green boxes. New
+  replay releases the reviewed green hold; image replay requests preparation
+  5.60s earlier for only0.9s, cap about-0.19m/s2. Not sustained braking or a full
+  stop; no vehicle install/native timing/closed-loop claim. Publish to BOTH
+  carrot-nav and carrot-wip, single-parent only. See docs/signal_a5_followup_20261012.md.
+
+- On 2026-10-12, the user reaffirmed that corrections must be committed and
+  pushed to ALL maintained carrot-* branches unless explicitly excepted. This
+  supersedes the earlier wip-only signal scope. Current remote targets are
+  carrot-wip and carrot-nav; do not recreate retired branches or modify other
+  contributors' namespaced branches. Port both signal preparation cadence and
+  night red-group corrections to nav, preserving its navigation/model/runtime
+  choices. Keep every new commit single-parent, preserve unrelated local work,
+  and distinguish branch publication from vehicle installation and road validation.
+
+- On 2026-10-12, the user requested solving the failed night-red preparation.
+  A separate night contract now requires 2–4 persistent compact red lamps with
+  compatible road-direction support, NOT a bounded distance or stop-line target.
+  Same-ID current-red templates bridge a direct core <=500ms without renewing
+  it. Night capture freshness is350ms; missing pair evidence is inactive with
+  <=350ms confirmation retention, and fresh forward green cancels. Only night
+  geometry erodes road edges by0.3+2*std (std<=1m); measured housing policy stays.
+  Mode2 alone actuates; keep CPU/DM protection and original ONNX. 492 tests pass.
+  Nine-minute replay enters once6.10s before original stopping, for1.1s to target
+  -0.27m/s2; +20/+100ms still enter, +250ms rejects. Prior4329-input regression
+  adds no entries. Not closed-loop improvement or guaranteed stop: identity loss
+  and applicability remain limitations. No vehicle deployment; read-only vehicle
+  remains carrot-nav135020d1. Work remains carrot-wip, single-parent only. See
+  docs/signal_night_group_20261012.md and private2026-10-12-night-geometry archive.
+
+- On 2026-10-12, the latest 10a4 evening drive has 1,063 fresh-red observer
+  outputs but zero moving preparation: every confirmed red box is a night core
+  or template, not a measured housing. Preserve confirmation across repeated
+  accepted samples ageing beyond 200ms, for at most 450ms from capture; output
+  remains inactive, and fresh new evidence/context/gap/session checks still win.
+  448 focused tests pass. Recorded-input replay of 10,276 planner samples and
+  +20ms delay still gives zero entries, as does an offline night lamp-ray/height
+  experiment: road confidence and broad/truncated range remain blocking. Do not
+  connect the failed night candidate, pretend inferred width is metric housing
+  size, or claim better stopping. No vehicle deployment/model changes. Work only
+  on carrot-wip with single-parent commits; preserve the separate nav checkout.
+  See docs/signal_night_prepare_20261012.md and private evidence archives.
+
+- On 2026-10-12, SignalAssistMode adds the requested live0/1/2 selection on
+  carrot-wip only:0 auxiliary OFF,1 display/alerts and stopped-red departure veto,
+  2 also conditional red preparation toward-0.5m/s2. Default0; old production
+  enable files cannot bypass it. Mode2 uses CPU housing evidence alongside either
+  driving model; preserve DM protection. Mode changes reject pre-activation
+  observations;0 clears the auxiliary veto without issuing go. Native rebuild
+  after pull is required for the new Params key. The user requested all signal
+  trial content on wip and SINGLE-PARENT commits going forward, superseding the
+  trial-only correction. Leave old topology/ref alone; no parallel trial changes.
+  Range audit finds6 observations of a real red outside3.5m, all with blinker on;
+  close signals mostly fail boundary confidence, not proven lateral exclusion.
+  See docs/signal_color_experiment_20261012.md for validation and limits.
+
+- On 2026-10-12, after correcting branch mistakes, the user superseded the
+  earlier trial-only instruction and explicitly requested ALL carrot-signal-shadow
+  contents integrated into carrot-wip. Preserve existing wip radar/font fixes.
+  Continue ONLY on carrot-wip with linear, single-parent commits; no merge
+  commits or parallel signal-branch development. Leave historical topology alone.
+  This includes the retrained Mountain Dew eGPU selection8d736683 and its pinned
+  runtime, while keeping internal/DM models and Jetson selection unchanged.
+  Add SignalAssistMode:0 fully OFF,1 display/alerts and red departure veto,
+  2 additionally gentle red stop preparation. This supersedes old per-file enables.
+
 - On 2026-10-12, the user clarified that traffic-light geometry must allow
   space on both sides of the ego lane. The opt-in stop preparation now expands
   each inner lane boundary by3.5m, clipped by reliable road edges with0.3m inward
@@ -81,6 +154,33 @@ successful Actions runs, and never report desktop test failures as device faults
   validation. 84 tests pass;21 default-OFF image results match prior code.
   No deployment, model training or live enable; keep DM GPU/start-guard policy.
   See docs/signal_color_experiment_20261012.md and its private evidence archive.
+
+- On 2026-10-11, user requested the latest signal camera observer with both
+  internal and retrained eGPU models, parked switching and performance checks.
+  Integrate the already deployed 42760 signal/display revisions into this trial;
+  retain its newer comparison/assist-OFF policy and preserve 7f3bfcd7 model/runtime
+  selection. The old October 10 assist-ON snapshot is historical, not the current
+  requested configuration. New camera neural output remains display/log only.
+
+- On 2026-10-11, the user selected upstream 6f4c0faf eGPU on this
+  carrot-signal-shadow branch only, for testing before a combined promotion.
+  Wip publication 03142df861 was reverted by b09ae3ddad; wip keeps Cinque v3.
+  Use retrained Mountain Dew 8d736683/12864, AMD 256f2178, isolated tinygrad
+  d3f09c9b and verified NAS package comma4-big-mdm-8d736683. Adapt byte-addressed
+  buffers while retaining prior dtype-bearing buffers. Empty-cache HTTPS
+  install and offline reuse pass; preserve startup delivery before build/manager.
+  Public ONNX catalog now has old 870a4823 but no matching 8d736683. Jetson
+  stays Cinque v2; internal/DM models and control/validity/warp policies stay
+  unchanged. No physical GPU, first-boot or driving validation is implied.
+  See docs/mdm_retrained_20261011.md. Keep the existing signal experiment scope.
+
+- On 2026-10-12, the user explicitly corrected the branch scope: current
+  signal experiments belong ONLY on carrot-signal-shadow, not carrot-wip.
+  Remove the five experimental commits5a80605d61,3f537bc13f,6df4f6296f,
+  df51eed7fb,4bc5307d0b from wip by a normal corrective commit; preserve the
+  trial branch, prior deployed helper/DM fixes and unrelated work. Future
+  signal experiments/settings/validation are trial-only until explicitly promoted.
+  Wip runtime/tools are restored byte-for-byte to85d97b3160. No vehicle action.
 
 - On 2026-10-12, the user requested collecting unseen night/morning logs and
   evaluating signal size/height/road-edge filtering, analysis first. All52
