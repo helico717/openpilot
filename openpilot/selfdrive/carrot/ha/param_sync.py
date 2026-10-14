@@ -289,7 +289,8 @@ def run_param_sync(config: dict, store: ProcessedQueueStore | None = None):
             if not resolved or resolved.get('_awaiting_provision'):
                 time.sleep(schedule.delay(None, now))
                 continue
-            config = resolved
+            config.update(resolved)
+            config.pop('_awaiting_provision', None)
             cloud_url = config['url'].rstrip('/')
             token = config['token']
             headers = {'Authorization': 'Bearer ' + token}

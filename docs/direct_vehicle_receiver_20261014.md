@@ -15,6 +15,7 @@
   첫 설정 수신이 실패해도 장치 ID와 자체 서버 destination을 유지해 CAN 수집과 outbox
   저장은 계속한다. 설정이 완료된 뒤 전송·명령·터미널이 재개되며 인증 대기 중에는
   옛 토큰으로 기록을 보내거나 성공 ACK를 처리하지 않는다.
+  인증 완료 시 공유 연결 객체도 갱신해 CAN 파일 수집/파라미터 연결이 함께 회복한다.
 - collector.py: telemetry/trip 경로·샘플/계산·독립 lane·재전송·성공 후 삭제 유지.
 - param_sync.py: 기존 15/3초·backoff·검증/readback·명시적 실패/ACK 재시도 유지.
   수신기 identity별 별도 처리 DB로 기존 숫자 queue ID 충돌 방지. 레거시 DB 유지.

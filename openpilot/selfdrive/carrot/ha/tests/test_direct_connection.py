@@ -80,7 +80,7 @@ class DirectConnectionTests(unittest.TestCase):
         source = Path(__file__).resolve().parents[1] / 'collector.py'
         tree = ast.parse(source.read_text(encoding='utf-8'))
         tree.body = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == 'delivery_config']
-        pending = {**self.config(), '_awaiting_provision': True}
+        pending = {**self.config(), 'token': 'p' * 32, '_awaiting_provision': True}
         ns = {'load_config': lambda: pending}
         exec(compile(tree, 'collector.py', 'exec'), ns)
         with tempfile.TemporaryDirectory() as directory:
@@ -92,6 +92,8 @@ class DirectConnectionTests(unittest.TestCase):
             self.assertEqual(store.count(), 2)
             ns['load_config'] = self.config
             self.assertEqual(ns['delivery_config'](pending), self.config())
+            self.assertNotIn('_awaiting_provision', pending)
+            self.assertEqual(pending['token'], 'u' * 32)
             self.assertEqual(store.count(), 2)
 
     def test_direct_poll_handles_replay_with_its_own_namespace(self):

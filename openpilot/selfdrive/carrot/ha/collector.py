@@ -70,6 +70,10 @@ def delivery_config(config):
     resolved = load_config() if config.get('_awaiting_provision') else config
     if not resolved or resolved.get('_awaiting_provision'):
         raise ConnectionError('Receiver setup pending')
+    if config.get('_awaiting_provision'):
+        # CAN capture and the parameter thread share this configuration object.
+        config.update(resolved)
+        config.pop('_awaiting_provision', None)
     return resolved
 
 
