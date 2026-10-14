@@ -36,6 +36,10 @@ class Store:
                 db.execute('INSERT OR IGNORE INTO outbox VALUES (?,?,?,?)',(identity,path,json.dumps(payload,allow_nan=False),now))
     def first(self):
         with self.connect() as db:return db.execute('SELECT id,path,body FROM outbox ORDER BY created,rowid LIMIT 1').fetchone()
+    def first_for(self, path):
+        """Independent FIFO lanes preserve every failed record without cross-blocking."""
+        with self.connect() as db:
+            return db.execute('SELECT id,path,body FROM outbox WHERE path=? ORDER BY created,rowid LIMIT 1',(path,)).fetchone()
     def latest_telemetry(self):
         """Prioritize a snapshot without deleting any of the historical backlog."""
         with self.connect() as db:

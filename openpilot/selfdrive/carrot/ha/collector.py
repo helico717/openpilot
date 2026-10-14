@@ -108,8 +108,9 @@ def main():
                 print('CAN sample:', type(error).__name__, flush=True)
             time.sleep(26)
 
-    def upload():
-        first_snapshot.wait()
+    def upload(lane):
+        if lane == '/api/telemetry':
+            first_snapshot.wait()
         delay = 2
         prefer_latest = True
 
@@ -119,7 +120,7 @@ def main():
 
         opener = urllib.request.build_opener(NoRedirect)
         while True:
-            row = (store.latest_telemetry() if prefer_latest else None) or store.first()
+            row = (store.latest_telemetry() if lane == '/api/telemetry' and prefer_latest else None) or store.first_for(lane)
             if not row:
                 time.sleep(2)
                 continue
@@ -142,11 +143,13 @@ def main():
                 store.acknowledge(key)
                 delay = 2
                 prefer_latest = not prefer_latest
-                atomic(STATE / 'delivery.json', {'status': 'ok', 'at': time.time(), 'path': path, 'pending': store.count()})
+                report = {'status': 'ok', 'at': time.time(), 'path': path, 'pending': store.count()}
+                atomic(STATE / ('delivery.json' if lane == '/api/telemetry' else 'delivery-trips.json'), report)
             except Exception as error:
                 prefer_latest = True
                 reason = type(error).__name__ + (' HTTP ' + str(error.code) if isinstance(error, urllib.error.HTTPError) else '')
-                atomic(STATE / 'delivery.json', {'status': 'retrying', 'reason': reason, 'pending': store.count(), 'at': time.time()})
+                atomic(STATE / ('delivery.json' if lane == '/api/telemetry' else 'delivery-trips.json'),
+                       {'status': 'retrying', 'reason': reason, 'path': lane, 'pending': store.count(), 'at': time.time()})
                 print('Upload retry:', reason, flush=True)
                 time.sleep(delay)
                 delay = min(120, delay * 2)
@@ -169,7 +172,10 @@ def main():
         print("CAN capture start error:", type(error).__name__, flush=True)
 
     threading.Thread(target=sample, daemon=True).start()
-    threading.Thread(target=upload, daemon=True).start()
+    # A telemetry HTTP failure/backoff must never stall finalized trips. Camera
+    # files already use the terminal daemon's separate HA-direct transfer task.
+    for lane in ('/api/telemetry', '/api/trips'):
+        threading.Thread(target=upload, args=(lane,), daemon=True).start()
 
     try:
         try:
