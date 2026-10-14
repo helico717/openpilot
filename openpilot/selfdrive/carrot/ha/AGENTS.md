@@ -1,3 +1,11 @@
+# Current Carrot HA receiver deployment — 2026-10-14
+
+Carrot HA now uses its own HAOS receiver app. Previous Worker/D1 deployment instructions
+are deprecated for this path. The user explicitly requested v0.9.0-beta.1 after completing
+all requested work; this overrides the earlier 0.8.x version constraint.
+Preserve Git-only Comma source deployment, no SSH/SCP source edits, user-only reboot,
+and companion driving-logs/CHANGELOG.md recording. See carrot-ha docs/CLEAN_INSTALL_RECOVERY.md.
+
 # Carrot HA daemon performance contract — 2026-10-01
 
 ## Passive CAN charging evidence — 2026-10-05

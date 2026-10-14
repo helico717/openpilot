@@ -1,4 +1,4 @@
-"""Standalone MyID4 CAN reader -> existing Cloudflare API, with durable outbox."""
+"""Standalone MyID4 CAN reader -> own vehicle receiver, with durable outbox."""
 from __future__ import annotations
 import json
 import os
@@ -209,7 +209,7 @@ def main():
     params = Params()
     consumed = -1
     last_health = 0
-    print('Carrot HA collector started: receive-only CAN, Cloudflare outbox.', flush=True)
+    print('Carrot HA collector started: receive-only CAN, vehicle receiver outbox.', flush=True)
 
     while True:
         time.sleep(1)

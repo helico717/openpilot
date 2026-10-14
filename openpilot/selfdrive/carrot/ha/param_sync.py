@@ -1,9 +1,9 @@
 """CarrotPilot parameter synchronizer.
 
-- Syncs settings catalog and current values from Carrot server (port 7000) or carrot_settings.json to Cloudflare Worker.
-- Polls Cloudflare Worker for pending parameter changes requested by Home Assistant.
+- Syncs settings catalog and current values from Carrot server (port 7000) or carrot_settings.json to vehicle receiver.
+- Polls vehicle receiver for pending parameter changes requested by Home Assistant.
 - Applies requested parameter changes locally via http://127.0.0.1:7000/api/param_set (without bypassing server validation).
-- Acknowledges applied parameter changes back to Cloudflare Worker.
+- Acknowledges applied parameter changes back to vehicle receiver.
 """
 from __future__ import annotations
 from contextlib import closing, contextmanager

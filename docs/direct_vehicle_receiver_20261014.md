@@ -1,6 +1,8 @@
+> 과거 Cloudflare 서버 설명은 폐기된 기록입니다. 현재 설치/복구는 companion carrot-ha의 docs/CLEAN_INSTALL_RECOVERY.md를 따릅니다.
+
 # 2026-10-14 — 자체 HAOS 차량 수신기로 전환
 
-사용자는 D1 용량/일일 쓰기 제한을 피하기 위해 Cloudflare 중계·저장을 자체 서버로
+사용자는 ~~D1~~ 용량/일일 쓰기 제한을 피하기 위해 ~~Cloudflare~~ 중계·저장을 자체 서버로
 이전하도록 요청했고, 기존 기능 전체 보존과 수정 전 이유·검증 기록을 요구했다.
 사전 계획은 carrot-ha `docs/direct-vehicle-receiver-plan-2026-10-14.md`, 3c9e4f0로
 실행 코드 수정 전에 원격 게시됐다. companion 실행 코드는 8303aae부터 준비됐다.
@@ -9,7 +11,7 @@
 
 - direct_connection.py: 검증된 HTTPS 설정을 runtime /data/carrot_ha에 원자 저장,
   JSON stdin setup와 명시적 rollback. 기존 connection.json·Git 소스·outbox는 수정하지 않음.
-- direct_receiver.json: 기존 Worker URL → 사용자가 알려준 DuckDNS 직접 수신 경로의
+- direct_receiver.json: 기존 ~~Worker~~ URL → 사용자가 알려준 DuckDNS 직접 수신 경로의
   공개 매핑만 포함. 토큰·장치 ID는 Git에 없음. load_config가 기존 장치 인증으로
   자체 서버 /api/provision에서 새 설정을 받고 영구 저장. 실패 시 cloud 복귀 없이 대기.
   첫 설정 수신이 실패해도 장치 ID와 자체 서버 destination을 유지해 CAN 수집과 outbox
@@ -33,4 +35,14 @@
   기기 SSH/SCP 소스 수정, 에이전트 기기 Pull·재부팅 없음.
 - 사용자는 기기가 켜져 있고 인터넷 정상이라고 확인했지만 실제 데몬의 신규
   직접 수신·HA 재시작 중 기록·명령·카메라·로그 검증은 미완료다.
-- 기존 Cloudflare DB는 rollback과 미이관 자료를 위해 삭제하지 않는다.
+- 기존 ~~Cloudflare~~ DB는 rollback과 미이관 자료를 위해 삭제하지 않는다.
+
+## 2026-10-14 — 클린 설치 준비와 표시 정리
+
+- 직접 설정 파일만 존재하는 클린 설치에서 manager가 수집기를 시작하지 않는 조건을 발견.
+- process_config.py에 /data/carrot_ha/direct-connection.json 감지를 추가.
+  기존 CarrotHaEnabled/legacy 설정 조건·주차 카메라 조건·다른 차량 프로세스는 유지.
+- 실제 시작 함수 AST를 분리 실행하여 직접 설정 단독 시작/설정 없음 미시작 회귀 검사 추가.
+- collector/param_sync의 옛 서버 표시·주석을 차량 수신기 표현으로 정리.
+- 직접 연결 7건 + parameter polling 4건 로컬 통과. Git 게시/실기 설치는 아직 대기.
+  사용자가 이전 40148b0d에서 터미널·주차 카메라·새 파일 로그를 확인한 사실과 구분.

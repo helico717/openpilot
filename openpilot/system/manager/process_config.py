@@ -118,6 +118,7 @@ def enable_carrot_ha(started: bool, params: Params, CP: car.CarParams) -> bool:
       params.get_bool("CarrotHaEnabled")
       or os.path.exists("/data/id4-collector/connection.json")
       or os.path.exists("/data/carrot_ha/connection.json")
+      or os.path.exists("/data/carrot_ha/direct-connection.json")
     )
   except Exception:
     return False

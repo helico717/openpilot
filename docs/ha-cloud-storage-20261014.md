@@ -1,6 +1,8 @@
+> 과거 Cloudflare 서버 설명은 폐기된 기록입니다. 현재 설치/복구는 companion carrot-ha의 docs/CLEAN_INSTALL_RECOVERY.md를 따릅니다.
+
 # HA 클라우드 상태/주행 송신 분리 — 2026-10-14
 
-- 원인: Cloudflare D1 DB 용량 초과로 오래된 텔레메트리 HTTP 500이 반복됐다.
+- 원인: ~~Cloudflare~~ ~~D1~~ DB 용량 초과로 오래된 텔레메트리 HTTP 500이 반복됐다.
   최신 상태 우선 송신은 갱신되지만 동일 FIFO 뒤의 16:06~17:50 주행이 지연됐다.
 - collector.py에 상태/주행 전용 송신 스레드를 두고 Store.first_for로 독립 FIFO를
   조회한다. 실패 자료와 기존 SQLite state/outbox는 보존하며 명시적 서버 ACK 뒤에만

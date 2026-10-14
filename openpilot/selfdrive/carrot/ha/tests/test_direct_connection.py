@@ -15,6 +15,18 @@ class DirectConnectionTests(unittest.TestCase):
         return {'transport': 'direct', 'url': 'https://ha.example/carrot-receiver',
                 'device': 'car', 'token': 'u' * 32}
 
+    def test_clean_install_direct_configuration_enables_manager(self):
+        source = Path('openpilot/system/manager/process_config.py').read_text()
+        node = next(node for node in ast.parse(source).body if isinstance(node, ast.FunctionDef)
+                    and node.name == 'enable_carrot_ha')
+        namespace = {'os': __import__('os'), 'Params': object, 'car': SimpleNamespace(CarParams=object)}
+        exec(compile(ast.Module(body=[node], type_ignores=[]), '<manager-gate>', 'exec'), namespace)
+        params = SimpleNamespace(get_bool=lambda key: False)
+        with patch('os.path.exists', side_effect=lambda path: path == '/data/carrot_ha/direct-connection.json'):
+            self.assertTrue(namespace['enable_carrot_ha'](False, params, None))
+        with patch('os.path.exists', return_value=False):
+            self.assertFalse(namespace['enable_carrot_ha'](False, params, None))
+
     def test_setup_is_atomic_persistent_and_never_changes_source(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'direct-connection.json'
