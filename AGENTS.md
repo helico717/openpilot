@@ -29,6 +29,43 @@ successful Actions runs, and never report desktop test failures as device faults
 
 # Repository memory
 
+- On 2026-10-14, the upper/lower signal-group trial fixes supplied qualified
+  observations but not actual departure: 43,090 historical planner inputs at
+  nominal/+20ms and 20 recent segments show no output changes; Santa Fe encoded
+  165-frame replay still has zero releases. Keep UpperSignalGroupTrial OFFLINE;
+  production guard/tracker remain unchanged. Fresh neural comparison gives
+  68/73 box-eligible images versus rules47, tiles70; tiny green cores10/37 or
+  tiles19/37 remain weak. Neural also fails identity/release at recorded timing.
+  No retraining or vehicle change. Next target is learned whole-housing/lamp
+  recognition with encounter-separated labels, not another live rule relaxation.
+  Publish offline tools/tests/findings to both maintained branches, single-parent.
+  See docs/signal_upper_group_trial_20261014.md; raw evidence stays private.
+
+- On 2026-10-14, Carnival 222-1 on 0245e76f shows late front arrival and a
+  stopping-path tail rejecting visible stationary corner 1193. Add missing-L1
+  measured L2 only with confident actual inner lanes, stopping context, stable
+  corner history and current visual agreement. Do not relax ordinary path/L1
+  gates. Replay selects 11 frames at 74.32m, about0.57s earlier, not closed-loop
+  stopping validation. User also requested screen + one short sound for an
+  unselected, vision-missing, stable front/corner stationary pair: TTC<=4.8s,
+  range<=120m, active longitudinal only, 500ms confirmation and encounter/cooldown
+  suppression. Existing100 logs/497 labels are identical in modes1/2/3; existing
+  failures11/10/13 and208 unverified remain. All119,689 prior mode1 outputs match;
+  no advisory fires, so real positive performance is unproven.1176 wip tests pass;
+  two new Carnival cases pass all modes. Publish both maintained branches and
+  verify automatic NAS replay deployment; no vehicle action. See
+  docs/carnival_stopped_car_20261014.md; recordings stay private.
+
+- On 2026-10-14, Elantra route311 segments3/10 confirms86->88% memory use.
+  DPathRadarD's lifetime Cap'n Proto builder leaks replaced list/error storage:
+  restore a fresh builder each update, preserving controller history and fields.
+  532 tests pass;2,399 recorded-input frames serialize identically.72,000 real-
+  payload updates grow old RSS23.02MiB, fixed0.086MiB then flat (accelerated PC,
+  not an hour of vehicle operation). Actual radar RSS grows3.31MiB across~8min;
+  loggerd grows36.86MiB and remains unexplained. Do not claim the overall88%
+  issue solved. Publish both maintained branches, single-parent; no vehicle action.
+  See docs/elantra_memory_20261014.md; recordings remain private.
+
 - On 2026-10-14, the user requested recovering uncommitted completed work and
   an explanation before publication. The pending October 3 changes are NNFF
   startup-notice retry, a default-OFF search-only NNFF setting, and a common
