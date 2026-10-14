@@ -22,3 +22,6 @@ class OutboxLaneTests(unittest.TestCase):
             self.assertEqual(restarted.first_for('/api/telemetry'), failed)
             self.assertIsNone(restarted.first_for('/api/trips'))
             self.assertEqual(restarted.count(), 2)
+            with restarted.connect() as db:
+                plan=db.execute('EXPLAIN QUERY PLAN SELECT id,path,body FROM outbox WHERE path=? ORDER BY created,rowid LIMIT 1',('/api/trips',)).fetchall()
+                self.assertTrue(any('outbox_lane_created' in row[3] for row in plan))

@@ -18,7 +18,7 @@ class Store:
     def __init__(self,path):
         self.path=str(path)
         with self.connect() as db:
-            db.executescript('CREATE TABLE IF NOT EXISTS state(id INTEGER PRIMARY KEY,body TEXT); CREATE TABLE IF NOT EXISTS outbox(id TEXT PRIMARY KEY,path TEXT,body TEXT,created REAL);')
+            db.executescript('CREATE TABLE IF NOT EXISTS state(id INTEGER PRIMARY KEY,body TEXT); CREATE TABLE IF NOT EXISTS outbox(id TEXT PRIMARY KEY,path TEXT,body TEXT,created REAL); CREATE INDEX IF NOT EXISTS outbox_lane_created ON outbox(path,created);')
     @contextmanager
     def connect(self):
         db=sqlite3.connect(self.path,timeout=20)
