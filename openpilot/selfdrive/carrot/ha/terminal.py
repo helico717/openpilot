@@ -296,11 +296,14 @@ async def run() -> None:
           print("[Carrot HA terminal] connected; waiting for an HA administrator", flush=True)
           delay = 2
           watcher = asyncio.create_task(watch_discovery(client, config, remote, resolved))
+          from openpilot.selfdrive.carrot.ha.driving_logs import run as sync_driving_logs
+          logs_task = asyncio.create_task(sync_driving_logs(resolved))
           try:
             await agent.connection(remote)
           finally:
             watcher.cancel()
-            await asyncio.gather(watcher, return_exceptions=True)
+            logs_task.cancel()
+            await asyncio.gather(watcher, logs_task, return_exceptions=True)
     except (aiohttp.ClientError, OSError, ValueError, RuntimeError, TimeoutError) as exc:
       print(f"[Carrot HA terminal] connection unavailable: {type(exc).__name__}", flush=True)
     await asyncio.sleep(delay)
