@@ -283,6 +283,17 @@ def run_param_sync(config: dict, store: ProcessedQueueStore | None = None):
 
     while True:
         now = time.monotonic()
+        if config.get('_awaiting_provision'):
+            from openpilot.selfdrive.carrot.ha.collector import load_config
+            resolved = load_config()
+            if not resolved or resolved.get('_awaiting_provision'):
+                time.sleep(schedule.delay(None, now))
+                continue
+            config = resolved
+            cloud_url = config['url'].rstrip('/')
+            token = config['token']
+            headers = {'Authorization': 'Bearer ' + token}
+            last_catalog_sync = last_catalog_attempt = float('-inf')
 
         # Poll for pending parameter changes from Home Assistant
         pending_res = _http_request(

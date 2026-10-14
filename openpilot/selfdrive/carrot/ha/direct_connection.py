@@ -34,12 +34,13 @@ def resolve(config, profile=PROFILE, path=PATH):
         return config
     destination = mapping['receiver_url']
     validate({'transport': 'direct', 'url': destination, 'device': config['device'], 'token': config['token']})
+    pending = {**config, 'transport': 'direct', 'url': destination, '_awaiting_provision': True}
     with _lock:
         path = Path(path)
         if path.is_file():
             return validate(json.loads(path.read_text(encoding='utf-8')))
         if time.monotonic() < _retry_at:
-            return None
+            return pending
         _retry_at = time.monotonic() + 15
         try:
             request = urllib.request.Request(destination + '/api/provision',
@@ -54,7 +55,7 @@ def resolve(config, profile=PROFILE, path=PATH):
             return direct
         except (OSError, ValueError, KeyError, TypeError):
             # Opted-in migration never sends data back to cloud on a temporary failure.
-            return None
+            return pending  # Device identity remains available for local CAN recording.
 
 
 def validate(config):

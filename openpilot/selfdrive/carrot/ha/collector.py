@@ -66,6 +66,13 @@ def atomic(path, data):
     temp.replace(path)
 
 
+def delivery_config(config):
+    resolved = load_config() if config.get('_awaiting_provision') else config
+    if not resolved or resolved.get('_awaiting_provision'):
+        raise ConnectionError('Receiver setup pending')
+    return resolved
+
+
 def main():
     STATE.mkdir(parents=True, exist_ok=True)
     config = load_config()
@@ -133,11 +140,12 @@ def main():
                 continue
             key, path, body = row
             try:
+                destination = delivery_config(config)
                 request = urllib.request.Request(
-                    config['url'].rstrip('/') + path,
+                    destination['url'].rstrip('/') + path,
                     data=body.encode(),
                     headers={
-                        'Authorization': 'Bearer ' + config['token'],
+                        'Authorization': 'Bearer ' + destination['token'],
                         'User-Agent': 'CarrotHA/0.3.0',
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'

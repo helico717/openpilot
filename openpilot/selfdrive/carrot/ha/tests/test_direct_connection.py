@@ -49,7 +49,10 @@ class DirectConnectionTests(unittest.TestCase):
             legacy = {'url': 'https://cloud.example', 'device': 'car', 'token': 'p' * 32}
             with patch.object(direct, '_retry_at', 0), patch.object(direct.urllib.request, 'build_opener') as opener:
                 opener.return_value.open.side_effect = OSError('offline')
-                self.assertIsNone(direct.resolve(legacy, profile, target))
+                pending = direct.resolve(legacy, profile, target)
+                self.assertTrue(pending['_awaiting_provision'])
+                self.assertEqual(pending['device'], 'car')
+                self.assertEqual(pending['url'], self.config()['url'])
                 self.assertFalse(target.exists())
             class Response:
                 def __enter__(self): return self
@@ -71,6 +74,25 @@ class DirectConnectionTests(unittest.TestCase):
                 opener.assert_not_called()
             direct.configure(self_config, target)
             self.assertFalse(target.with_suffix('.disabled').exists())
+
+    def test_recording_continues_while_delivery_setup_is_pending(self):
+        from openpilot.selfdrive.carrot.ha.engine import Store
+        source = Path(__file__).resolve().parents[1] / 'collector.py'
+        tree = ast.parse(source.read_text(encoding='utf-8'))
+        tree.body = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == 'delivery_config']
+        pending = {**self.config(), '_awaiting_provision': True}
+        ns = {'load_config': lambda: pending}
+        exec(compile(tree, 'collector.py', 'exec'), ns)
+        with tempfile.TemporaryDirectory() as directory:
+            store = Store(Path(directory) / 'outbox.sqlite3')
+            store.save({}, [('/api/telemetry', {'deviceId': pending['device'], 'updatedAt': 'old'}),
+                            ('/api/trips', {'id': 'trip', 'distanceM': 1000})], 1)
+            with self.assertRaises(ConnectionError):
+                ns['delivery_config'](pending)
+            self.assertEqual(store.count(), 2)
+            ns['load_config'] = self.config
+            self.assertEqual(ns['delivery_config'](pending), self.config())
+            self.assertEqual(store.count(), 2)
 
     def test_direct_poll_handles_replay_with_its_own_namespace(self):
         with tempfile.TemporaryDirectory() as directory:

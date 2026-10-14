@@ -276,7 +276,7 @@ async def run() -> None:
   delay = 2
   while True:
     config = load_config()
-    if not config:
+    if not config or config.get('_awaiting_provision'):
       await asyncio.sleep(30)
       continue
     try:

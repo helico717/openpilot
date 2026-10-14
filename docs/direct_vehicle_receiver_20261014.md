@@ -12,6 +12,9 @@
 - direct_receiver.json: 기존 Worker URL → 사용자가 알려준 DuckDNS 직접 수신 경로의
   공개 매핑만 포함. 토큰·장치 ID는 Git에 없음. load_config가 기존 장치 인증으로
   자체 서버 /api/provision에서 새 설정을 받고 영구 저장. 실패 시 cloud 복귀 없이 대기.
+  첫 설정 수신이 실패해도 장치 ID와 자체 서버 destination을 유지해 CAN 수집과 outbox
+  저장은 계속한다. 설정이 완료된 뒤 전송·명령·터미널이 재개되며 인증 대기 중에는
+  옛 토큰으로 기록을 보내거나 성공 ACK를 처리하지 않는다.
 - collector.py: telemetry/trip 경로·샘플/계산·독립 lane·재전송·성공 후 삭제 유지.
 - param_sync.py: 기존 15/3초·backoff·검증/readback·명시적 실패/ACK 재시도 유지.
   수신기 identity별 별도 처리 DB로 기존 숫자 queue ID 충돌 방지. 레거시 DB 유지.
