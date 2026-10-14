@@ -291,8 +291,10 @@ def run_param_sync(config: dict, store: ProcessedQueueStore | None = None):
                 continue
             config.update(resolved)
             config.pop('_awaiting_provision', None)
-            cloud_url = config['url'].rstrip('/')
-            token = config['token']
+        # Another upload lane may complete provisioning on the shared object.
+        current_url, current_token = config['url'].rstrip('/'), config['token']
+        if current_url != cloud_url or current_token != token:
+            cloud_url, token = current_url, current_token
             headers = {'Authorization': 'Bearer ' + token}
             last_catalog_sync = last_catalog_attempt = float('-inf')
 

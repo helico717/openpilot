@@ -96,6 +96,25 @@ class DirectConnectionTests(unittest.TestCase):
             self.assertEqual(pending['token'], 'u' * 32)
             self.assertEqual(store.count(), 2)
 
+    def test_parameter_headers_refresh_when_another_lane_updates_shared_config(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = param_sync.ProcessedQueueStore(Path(directory) / 'params.sqlite3')
+            config = {**self.config(), 'token': 'p' * 32}
+            def clock():
+                config['token'] = 'u' * 32
+                return 0
+            calls = []
+            def http(url, **kwargs):
+                calls.append(kwargs['headers']['Authorization'])
+                return {'ok': True, 'pending': [], 'queue_namespace': 'server-one'}
+            with patch.object(param_sync, 'STATE', Path(directory)), patch.object(param_sync.time, 'monotonic', side_effect=clock), \
+                 patch.object(param_sync, '_http_request', side_effect=http), \
+                 patch.object(param_sync, 'fetch_local_settings_snapshot', return_value=None), \
+                 patch.object(param_sync.time, 'sleep', side_effect=InterruptedError):
+                with self.assertRaises(InterruptedError):
+                    param_sync.run_param_sync(config, store)
+            self.assertEqual(calls, ['Bearer ' + 'u' * 32])
+
     def test_direct_poll_handles_replay_with_its_own_namespace(self):
         with tempfile.TemporaryDirectory() as directory:
             state = Path(directory)
