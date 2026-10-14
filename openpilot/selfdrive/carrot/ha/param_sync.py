@@ -274,10 +274,12 @@ def run_param_sync(config: dict, store: ProcessedQueueStore | None = None):
     last_catalog_sync = float("-inf")
     last_catalog_attempt = float("-inf")
     schedule = PollSchedule()
+    legacy_store = store
+    namespace = None
     CATALOG_SYNC_INTERVAL = 180.0  # Sync full catalog every 3 minutes
 
     print(f"[param_sync] starting CarrotPilot parameter sync loop for device: {device_id}", flush=True)
-    print(f"[param_sync] target Cloudflare Worker: {cloud_url}", flush=True)
+    print(f"[param_sync] target vehicle receiver: {cloud_url}", flush=True)
 
     while True:
         now = time.monotonic()
@@ -290,7 +292,19 @@ def run_param_sync(config: dict, store: ProcessedQueueStore | None = None):
             verbose=False
         )
 
+        if (config.get('transport') == 'direct' and pending_res and pending_res.get('ok')
+                and not isinstance(pending_res.get('queue_namespace'), str)):
+            pending_res = None  # Never apply direct-server IDs in the legacy namespace.
+
         if pending_res and pending_res.get("ok"):
+            incoming_namespace = pending_res.get('queue_namespace')
+            if incoming_namespace != namespace:
+                if incoming_namespace is None:
+                    store = legacy_store
+                else:
+                    from openpilot.selfdrive.carrot.ha.direct_connection import queue_store_path
+                    store = ProcessedQueueStore(queue_store_path(STATE, incoming_namespace))
+                namespace = incoming_namespace
             pending_list = pending_res.get("pending", [])
             if pending_list:
                 applied_ids = []
@@ -381,6 +395,8 @@ def run_param_sync(config: dict, store: ProcessedQueueStore | None = None):
                         "failed_ids": failed_ids,
                         "current_values": current_values
                     }
+                    if namespace is not None:
+                        ack_payload['queue_namespace'] = namespace
                     ack_res = _http_request(
                         f"{cloud_url}/api/params/ack",
                         data=ack_payload,
@@ -404,7 +420,7 @@ def run_param_sync(config: dict, store: ProcessedQueueStore | None = None):
                     "catalog": snapshot["settings"],
                     "values": snapshot["values"],
                 }
-                print(f"[param_sync] uploading {len(snapshot['values'])} parameters to Cloudflare...", flush=True)
+                print(f"[param_sync] uploading {len(snapshot['values'])} parameters to vehicle receiver...", flush=True)
                 res = _http_request(
                     f"{cloud_url}/api/settings/sync",
                     data=sync_payload,

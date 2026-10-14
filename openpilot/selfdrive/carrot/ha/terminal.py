@@ -233,7 +233,8 @@ async def discover(client, config):
   """Use the existing upload identity; never write connection.json."""
   address = config.get('url', '')
   url = urlsplit(address)
-  if url.scheme != 'https' or not url.hostname or url.username or url.password or url.query or url.fragment or url.path not in ('', '/'):
+  allowed_path = url.path.rstrip('/') in ('', '/carrot-receiver') if config.get('transport') == 'direct' else url.path in ('', '/')
+  if url.scheme != 'https' or not url.hostname or url.username or url.password or url.query or url.fragment or not allowed_path:
     raise ValueError('invalid Worker URL')
   async with client.get(
     address.rstrip('/') + '/api/terminal/bootstrap?' + urlencode({'device_id': config['device']}),

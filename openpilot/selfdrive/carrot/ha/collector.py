@@ -33,6 +33,11 @@ LOCK_FILE = DATA_DIR / 'collector.lock'
 
 
 def load_config() -> dict | None:
+    # Explicit direct mode is authoritative: never silently fall back to cloud
+    # when its configuration is invalid or the receiver is unavailable.
+    from openpilot.selfdrive.carrot.ha.direct_connection import PATH, validate, resolve
+    if PATH.is_file():
+        return validate(json.loads(PATH.read_text(encoding='utf-8')))
     candidates = [
         os.getenv("CARROT_HA_CONFIG"),
         "/data/id4-collector/connection.json",
@@ -42,14 +47,14 @@ def load_config() -> dict | None:
     for p in candidates:
         if p and Path(p).is_file():
             try:
-                return json.loads(Path(p).read_text(encoding='utf-8'))
+                return resolve(json.loads(Path(p).read_text(encoding='utf-8')))
             except Exception:
                 pass
     try:
         from openpilot.common.params import Params
         raw = Params().get("CarrotHaConfig")
         if raw:
-            return json.loads(raw.decode('utf-8'))
+            return resolve(json.loads(raw.decode('utf-8')))
     except Exception:
         pass
     return None
@@ -71,7 +76,9 @@ def main():
 
     from urllib.parse import urlsplit
     url = urlsplit(config['url'])
-    if url.scheme != 'https' or not url.hostname or url.username or url.password or url.path not in ('', '/') or url.query or url.fragment:
+    if (url.scheme != 'https' or not url.hostname or url.username or url.password
+            or (url.path.rstrip('/') not in ('', '/carrot-receiver') if config.get('transport') == 'direct'
+                else url.path not in ('', '/')) or url.query or url.fragment):
         raise ValueError('Invalid Worker URL')
 
     from openpilot.cereal import messaging
