@@ -64,6 +64,13 @@ class DirectConnectionTests(unittest.TestCase):
                 self.assertEqual(opener.return_value.open.call_count, 1)
                 request = opener.return_value.open.call_args.args[0]
                 self.assertEqual(request.full_url, self_config['url'] + '/api/provision')
+            target.unlink()
+            target.with_suffix('.disabled').write_text('explicit rollback')
+            with patch.object(direct.urllib.request, 'build_opener') as opener:
+                self.assertEqual(direct.resolve(legacy, profile, target), legacy)
+                opener.assert_not_called()
+            direct.configure(self_config, target)
+            self.assertFalse(target.with_suffix('.disabled').exists())
 
     def test_direct_poll_handles_replay_with_its_own_namespace(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -25,6 +25,8 @@ def resolve(config, profile=PROFILE, path=PATH):
     """Only a Git-managed explicit source mapping may bootstrap a new destination."""
     global _retry_at
     profile = Path(profile)
+    if Path(path).with_suffix('.disabled').exists():
+        return config  # Only an explicit operator rollback can re-enable the previous source.
     if not profile.is_file():
         return config
     mapping = json.loads(profile.read_text(encoding='utf-8'))
@@ -84,6 +86,7 @@ def configure(config, path=PATH):
         handle.flush()
         os.fsync(handle.fileno())
     temporary.replace(path)
+    path.with_suffix('.disabled').unlink(missing_ok=True)
 
 
 def queue_store_path(state, namespace):
@@ -95,6 +98,8 @@ def queue_store_path(state, namespace):
 if __name__ == '__main__':
     # stdin keeps credentials out of shell history. Existing cloud config is retained for rollback.
     if sys.argv[1:] == ['--rollback']:
+        PATH.parent.mkdir(parents=True, exist_ok=True)
+        PATH.with_suffix('.disabled').write_text('explicit rollback\n', encoding='utf-8')
         PATH.unlink(missing_ok=True)
         print('Direct receiver disabled. Restart collector to use previous configuration.')
     elif not sys.argv[1:]:
