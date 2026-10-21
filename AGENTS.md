@@ -29,6 +29,57 @@ successful Actions runs, and never report desktop test failures as device faults
 
 # Repository memory
 
+- On 2026-10-21, user requests enabling GPU recurrence if beneficial, then
+  tracing/fixing remaining >50ms calls. NAV defaults stateful TRT recurrence ON;
+  explicit env0 retains diagnostic host path, Wip backend/model untouched.
+  Same N16/live NAV/USB HUD/FIFO2 OFF/ON/ON/OFF120s: means44.294/42.414/42.439/
+  44.314ms, no frame-ID gaps or invalid model/DM/pose; ON2 counts2399 not strict
+  >=20Hz. Mean gain1.877ms/4.24%; both modes2>50ms in240s, tail NOT fixed.
+  ON worst60.985ms has same-frame server27.89/roundtrip55.32ms; investigate
+  outside-server path rather than call it GPU inference. HUD480/480 fresh,
+  NAV preview479/480; NAV ready471/480 with position/route-position exceptions.
+  67 focused desktop regressions pass. Signed runtime deployment/trace follow-up
+  recorded in docs/jetson_gpu_state_activation_20261021.md. Raw private.
+
+
+- On 2026-10-21, user requests review/integration of tjdgus200 7cbedfe/8f0cd37.
+  NAV gains default-OFF GPU recurrent state with all-state finite scan, reply
+  event and same-stream trailing feedback/reset; no async USB/model/deadline
+  changes. Wip lacks N16 stateful infrastructure: common C3/C3X eligibility and
+  record only, preserving model choices. Exact tici/tizi/mici + aarch644.9.103,
+  dynamic owned DWC3 workers, FIFO2 lease/restoration unchanged; C3 unmeasured.
+  Actual guarded offroad Orin N16 OFF/ON/ON/OFF,250frames each incl3 resets:
+  all outputs exactly equal; means26.828/24.633/24.631/26.743ms (~2.153ms gain).
+  Actual CUDA checks all65536 fp16 patterns plus signed fp32 finite/Inf/NaNs.
+  Initial diagnostic child missing video/render groups failed before inference;
+  corrected account groups pass; existing runtime691566 restored automatically.
+  Original offroad parameter restored; final60s model/DM/cameras/odometry each
+  1200 valid consecutive at20Hz, livePose1200 healthy; FIFO2/N16 ready.
+  Native timings exclude USB/DM/live NAV,
+  not a full-system/road/locationd fix.112 focused desktop tests pass; Linux
+  socket/fcntl checks use CI. Signed runtime pin and live GPU opt-in unchanged.
+  NAV a51dcb02d5/wip e925a3cce4 Linux integration and Windows installer CI pass.
+  See docs/jetson_gpu_usb_review.md; private diagnostic scripts/logs excluded.
+
+
+- On 2026-10-21, owner requests restoring comma-to-Jetson USB display traffic.
+  Nav-only new receiver capability selects bounded snapshot plus at most two
+  32KiB media fragments during GPU execution; old receivers retain Wi-Fi until
+  updated. Preserve N16 and FIFO2 helper, no ESP32 return. Parked120s Wi-Fi/USB
+  each2400 consecutive valid model frames, healthy pose; mean44.256/44.226ms,
+  max63.704/63.361ms,3/2 above50. USB adds~0.644MB/s,7% of9.18MB/s model input;
+  main-threadCPU+1.63ms/frame, wholeCPU78.38->77.13% is not causal attribution.
+  Phone960x540 video and mode7 preview fresh120/120 USB samples. NAV validity
+  route_position throughout USB: no valid-route driving or full deadline claim.
+  Wi-Fi return60s1200 consecutive valid each,mean44.381/max52.838,two>50.
+  Signed host691566f0fa published/HTTPS verified, N16 unchanged. Ordinary
+  Git Pull/comma reboot682ceeb484 and normal Jetson boot update verified; no
+  manual cache/SD patch. Final120s NAV ready120/120,2400 consecutive valid
+  model/DM/both cameras,pose healthy;mean44.174/max57.566ms,two>50. HUD/preview
+  fresh120/120,phone video no decode drops. Display~0.707MB/s(7.70%). USB stays
+  applied; temporary offroad/overrides cleared. Wip alreadyUSB: models unchanged,
+  Cinquev2 Jetson and MDv3 eGPU. See docs/jetson_usb_hud_restore_20261021.md.
+
 - On 2026-10-21, owner rejects ending Jetson latency trials with diagnostics
   restored only. Retain FIFO2 USB completion scheduling through a session root
   helper on tested mici/aarch64 Linux4.9.103. Discover actual dwc3_bh_work
