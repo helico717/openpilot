@@ -29,6 +29,25 @@ successful Actions runs, and never report desktop test failures as device faults
 
 # Repository memory
 
+- On 2026-10-21, paired USB trace localizes50.092ms call to comma reply
+  rearm:8.496ms userspace gap after first read, worker queue0.051ms,
+  completion-return0.094ms; normal-priority watchdog wakes sleeping reader.
+  GIL inversion inferred, lock not directly traced. Separate watchdog runnable
+  wait25.533ms. FIFO1 trial stops at61.65s on observer camera/model gap
+  (observer88.65ms gap), no causal camera-regression claim; priority restored.
+  Coalesce watchdog wakes against earliest pending timer; preserve earlier-arm,
+  close, expiry/cancel and outside-lock abort semantics. Old1000-write test
+  fails2002notifications; new passes.73NAV/62Wip desktop checks and both CIs pass.
+  GPU signed default activation9cfe verified via normal boot updater, no overlay.
+  Normal Git Pull/reboot installs cd986d7e9d; two120s windows4800 calls,
+  mean42.443/max48.327ms/zero>50. First observer omission recovered valid in
+  original rlog; buffered repeat2400 consecutive valid model/DM/both cameras,
+  pose healthy. NAV/HUD/preview240/240 ready/fresh. Watchdog~0.77 switches/s
+  vs prior short trace106.9/s; original OTHER policy. No hard deadline/road or
+  all-locationd cure claim. Wip source2ea4415ac2; no host update for this fix.
+  See docs/jetlink_watchdog_latency_20261021.md; raw private.
+
+
 - On 2026-10-21, user requests enabling GPU recurrence if beneficial, then
   tracing/fixing remaining >50ms calls. NAV defaults stateful TRT recurrence ON;
   explicit env0 retains diagnostic host path, Wip backend/model untouched.
