@@ -29,6 +29,33 @@ successful Actions runs, and never report desktop test failures as device faults
 
 # Repository memory
 
+- On 2026-10-23, owner requests existing signal observations on Jetson USB HUD.
+  NAV forwards bounded allowlisted4KiB/20-track metadata in existing10Hz HUD,
+  drops optional signal field first at96KiB budget; no extra image/message.
+  Original camera dimensions/EOF accompany JPEG; renderer-only adapters reuse
+  status ring and road boxes, clock/duplicate/frame-reuse/expiry/session gates.
+  No vehicle writes, model/control/deadline/priority change.98desktop checks
+  pass/2native skips including actual renderer/draw doubles. Linux1142/56skip,
+  94update/119nav/11storage/11network and Windows installer pass;26pin checks/1skip.
+  Signed host54e706fa05/64707580B/42c2951e full HTTPS/hash verified,1099files.
+  Synthetic1-track232B/sample; no actual vehicle latency/screen/road claim.
+  Signed runtime for Git Pull/BOTH reboot; wip records only. See
+  docs/jetson_usb_signal_display_20261023.md for final release validation.
+
+- On 2026-10-23, owner requests contributor fc02df9/e812f68 integration.
+  Include prerequisite936ea57 native image conversion and os initialization fix.
+  Exact N16 model/spec defaults direct compact-map scatter and exact C uint8/FP16
+  lookup ON; explicit env0 retains original paths, other models unchanged.
+  Native compile/load/self-test failure falls back to NumPy; no per-frame build.
+  Preserve scalar/state validation, expiry/raw maps, projection and USB deadlines.
+  Windows94pass/34native-POSIX skips; combined real-C/session/state checks use
+  Linux CI1117/56skip+94update/119nav/11storage/11network and Windows pass.
+  Source e4779e059a signed64702473B/f17dd14a runtime HTTPS/hash verified;
+  1097 committed payload files,26 pin/bundle checks pass/1skip.
+  No local Orin/USB/road benchmark or additive timing/tail cure claim.
+  Vehicle off, publish signed runtime for Git Pull/BOTH reboot; wip record only.
+  See docs/jetson_n16_staging_integration_20261023.md for validation and release.
+
 - On 2026-10-23, owner requests contributor136119c/2e971ad review, then explicitly
   requests publication without vehicle tests (Jetson off). NAV accepts exact
   N16/spec-negotiated2066/18580-float replies, saving66056B/frame, preserving
