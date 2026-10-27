@@ -22,9 +22,9 @@ import requests
 from openpilot.cereal import messaging
 from openpilot.common.params import Params
 try:
-    from .telemetry_fields import OPTIONAL_MESSAGES, decode_optional, decode_battery_energy, decode_battery_monitoring, decode_bms_actual
+    from .telemetry_fields import OPTIONAL_MESSAGES, decode_optional, decode_battery_energy, decode_battery_monitoring, decode_bms_actual, decode_display_soc_candidate
 except (ImportError, ValueError):
-    from telemetry_fields import OPTIONAL_MESSAGES, decode_optional, decode_battery_energy, decode_battery_monitoring, decode_bms_actual
+    from telemetry_fields import OPTIONAL_MESSAGES, decode_optional, decode_battery_energy, decode_battery_monitoring, decode_bms_actual, decode_display_soc_candidate
 
 CONFIG_PATH = Path(os.getenv("WAYON_CLOUD_CONFIG", "/data/wayon_cloud/config.json"))
 STATE_PATH = Path(os.getenv("WAYON_VEHICLE_STATE", "/data/wayon_cloud/vehicle_state.json"))
@@ -236,11 +236,16 @@ def sample_vehicle_can(timeout_s: float = 6.0) -> dict:
     for packet_ns, packet_frames in frames:
       observed = unix_offset + packet_ns / 1e9
       for address, payload, bus in packet_frames:
-        if bus not in (0, 1) or address not in (0x16A954A6, 0x1A5555B2, 0x1A555551, 0xCF):
+        if bus not in (0, 1) or address not in (0x16A954A6, 0x1A5555B2, 0x1A555551, 0xCF, 0x14A):
           continue
-        if address == 0x1A555551 and bus != 1:
-          continue  # Only physical bus1 was validated for this new signal.
-        decoded = decode_bms_actual(payload, bus) if address == 0xCF else decode_battery_monitoring(address, payload)
+        if address in (0x1A555551, 0x14A) and bus != 1:
+          continue  # Only physical bus1 was validated for these signals.
+        if address == 0xCF:
+          decoded = decode_bms_actual(payload, bus)
+        elif address == 0x14A:
+          decoded = decode_display_soc_candidate(payload, bus)
+        else:
+          decoded = decode_battery_monitoring(address, payload)
         if decoded:
           times = result.setdefault('_battery_can_measured_at', {})
           for key, value in decoded.items():

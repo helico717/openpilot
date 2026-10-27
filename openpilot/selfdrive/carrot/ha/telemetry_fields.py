@@ -160,3 +160,20 @@ def decode_bms_actual(payload, bus):
     return {f'bms_actual_mode_bus{bus}': mode,
             f'bms_power_w_bus{bus}': round(current * voltage, 2) if valid else None,
             f'bms_voltage_v_bus{bus}': voltage if valid else None}
+
+
+DISPLAY_SOC_CANDIDATE_KEY = 'display_soc_candidate_percent'
+BATTERY_MONITOR_KEYS.add(DISPLAY_SOC_CANDIDATE_KEY)
+
+def decode_display_soc_candidate(payload, bus):
+    """Receive-only bus1 0x14A byte19 x0.5%: instrument-cluster SOC CANDIDATE.
+
+    Evidence: meb-can-research raw-can-full-audit-2026-10-05 (r~0.9999 vs energy)
+    and raw-can-ac-dc-validation-2026-10-05 (±1%p vs cluster notes). Not yet
+    validated against the cluster; never replaces the Wh-based soc_percent.
+    Raw 254/255 (init) and >100% clear the value instead of refreshing it.
+    """
+    if bus != 1 or len(payload) != 32:
+        return {}
+    raw = payload[19]
+    return {DISPLAY_SOC_CANDIDATE_KEY: raw * .5 if raw <= 200 else None}

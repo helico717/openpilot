@@ -119,6 +119,15 @@ class Engine:
             if valid_wh or valid_soc:
                 point = {'at':stamp(now), 'battery_wh':wh if valid_wh else None,
                          'soc_percent':soc if valid_soc else None}
+                # Cluster-SOC candidate (0x14A) is comparison-only: it never
+                # gates energy completeness or replaces the Wh-based SOC.
+                display = (sampled or {}).get('display_soc_candidate_percent')
+                display_at = ((sampled or {}).get('_battery_can_measured_at') or {}).get('display_soc_candidate_percent')
+                if (type(display) in (int,float) and math.isfinite(display) and 0 <= display <= 100
+                        and type(display_at) in (int,float) and math.isfinite(display_at) and 0 <= now-display_at <= 180):
+                    point.update(display_soc_candidate_percent=display, display_soc_candidate_measured_at=stamp(display_at))
+                else:
+                    point.update(display_soc_candidate_percent=None, display_soc_candidate_measured_at=None)
                 previous = trip.get('energy_end')
                 if previous:
                     t = datetime.fromisoformat(previous['at']).timestamp()
