@@ -59,6 +59,13 @@ def decode_optional(vl_all, bus=None):
     if temp is not None:
         # raw 254/255 -> 214/215 C are init/error. This is NOT pack temperature.
         result['dcdc_temperature_c'] = temp if math.isfinite(temp) and -40 <= temp <= 213 else None
+    # Observation only (never used for range): raw 510/511 and 254/255 are Init/error, not watts.
+    # NA is the HV auxiliary load; Klima_Vorgabe is a climate power REQUEST, not measured use.
+    for key, signal, maximum in (('hv_aux_power_w', 'HVEM_IstLeistungNA', 25450.0),
+                                 ('climate_power_request_w', 'HVEM_Leistung_Klima_Vorgabe', 12650.0)):
+        value = last('HVEM_02', signal)
+        if type(value) in (int, float) and math.isfinite(value) and 0 <= value <= maximum:
+            result[key] = float(value)
     return result
 
 
