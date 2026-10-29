@@ -9,6 +9,7 @@ import asyncio
 import hashlib
 import hmac
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -45,6 +46,41 @@ def completed(root):
   return sorted(candidates, key=lambda item: (item[1], item[0].name), reverse=True)
 
 
+class ActivationTracker:
+  """Persist an activation's baseline: existing segments can never join it."""
+  def __init__(self, path):
+    self.path = path
+    try:
+      self.state = json.loads(path.read_text())
+      if (not isinstance(self.state, dict) or 'generation' not in self.state or not isinstance(self.state.get('known'), dict)
+          or any(v is not None and (type(v) not in (int, float) or not math.isfinite(v) or v <= 0) for v in self.state['known'].values())):
+        raise ValueError('Invalid activation receipt')
+    except (OSError, ValueError):
+      self.state = {'generation': None, 'known': {}}
+
+  def observe(self, policy, root):
+    generation = policy.get('generation')
+    enabled = (policy.get('enabled') is True and isinstance(generation, str) and bool(generation)
+               and type(policy.get('since')) in (int, float) and math.isfinite(policy['since'])
+               and 0 < policy['since'] <= time.time() + 60)
+    names = {p.name for p in root.iterdir() if p.is_dir() and not p.is_symlink() and SEGMENT.fullmatch(p.name)} if root.exists() else set()
+    old = self.state
+    if not enabled or generation != old['generation']:
+      # Also exclude open/locked segments already recording when activation arrives.
+      state = {'generation': generation if enabled else None, 'known': {n: None for n in names}}
+    else:
+      state = {'generation': generation, 'known': {n: old['known'].get(n, time.time()) for n in names}}
+    if state != old:
+      temporary = self.path.with_suffix('.tmp')
+      temporary.write_text(json.dumps(state))
+      temporary.replace(self.path)
+      self.state = state
+    return enabled
+
+  def started(self, name):
+    return self.state['known'].get(name)
+
+
 async def prepare_video(video, working):
   if video.suffix == '.mp4':
     return video
@@ -68,7 +104,8 @@ async def prepare_video(video, working):
   return output
 
 
-async def transfer(client, base, directory, recorded, rlog, video, working):
+async def transfer(client, base, directory, recorded, rlog, video, working, *, generation=None, started=None):
+  headers = {} if generation is None else {'X-Transfer-Generation': generation, 'X-Recording-Started': str(started)}
   mp4 = await prepare_video(video, working)
   duration = None
   if probe := shutil.which('ffprobe'):
@@ -90,7 +127,7 @@ async def transfer(client, base, directory, recorded, rlog, video, working):
   sources = {p.name: p for p in (rlog, video, mp4)}
   signatures = {f: (p.stat().st_size, p.stat().st_mtime_ns) for f, p in sources.items()}
   files = {f: value[0] for f, value in signatures.items()}
-  async with client.post(base + '/begin', json={'segment': directory.name, 'recorded': recorded, 'duration': duration, 'files': files}, allow_redirects=False) as response:
+  async with client.post(base + '/begin', json={'segment': directory.name, 'recorded': recorded, 'duration': duration, 'files': files}, headers=headers, allow_redirects=False) as response:
     response.raise_for_status()
     status = await response.json()
   if not status.get('accepted') or status.get('complete'):
@@ -109,7 +146,7 @@ async def transfer(client, base, directory, recorded, rlog, video, working):
         if end > offset:
           chunk = data[max(0, offset - position):]
           async with client.put(base + '/chunk/' + quote(directory.name, safe='') + '/' + quote(filename, safe=''),
-                                data=chunk, headers={'X-Upload-Offset': str(max(position, offset))}, allow_redirects=False) as response:
+                                data=chunk, headers={**headers, 'X-Upload-Offset': str(max(position, offset))}, allow_redirects=False) as response:
             response.raise_for_status()
             ack = await response.json()
             if ack.get('offset') != end:
@@ -120,7 +157,7 @@ async def transfer(client, base, directory, recorded, rlog, video, working):
     if (source.stat().st_size, source.stat().st_mtime_ns) != signatures[filename]:
       raise OSError('Finalized source changed during transfer')
     hashes[filename] = digest.hexdigest()
-  async with client.post(base + '/commit', json={'segment': directory.name, 'hashes': hashes}, allow_redirects=False) as response:
+  async with client.post(base + '/commit', json={'segment': directory.name, 'hashes': hashes}, headers=headers, allow_redirects=False) as response:
     response.raise_for_status()
     result = await response.json()
     if result.get('complete') is not True:
@@ -143,25 +180,34 @@ async def run(resolved, root=Path('/data/media/0/realdata'), state_root=Path('/d
   delay = 15
   last_check = 0
   floor = 0
+  tracker = ActivationTracker(state_root / (identity + '.activation.json'))
+  policy = {}
+  enabled = False
   async with aiohttp.ClientSession(timeout=timeout, headers={'Authorization': 'Bearer ' + credential(resolved['terminal_token'])}) as client:
     while True:
       try:
         if time.monotonic() - last_check >= 15:
-          async with client.get(base + '/state', allow_redirects=False) as response:
+          async with client.get(base + '/state', params={'generation': policy.get('generation', '')}, allow_redirects=False) as response:
             response.raise_for_status()
             inventory = await response.json()
+          policy = inventory.get('transfer', {})
+          enabled = await asyncio.to_thread(tracker.observe, policy, root)
           floor = inventory.get('floor', 0)
           if not isinstance(floor, (int, float)) or not isinstance(inventory.get('complete'), dict):
             raise ValueError('Invalid HA log inventory')
           done = inventory['complete']
           last_check = time.monotonic()
+        if not enabled:
+          await asyncio.sleep(15)
+          continue
+        await asyncio.to_thread(tracker.observe, policy, root)
         items = await asyncio.to_thread(completed, root)
         names = {item[0].name for item in items}
         done = {key: value for key, value in done.items() if key in names}
         # Re-evaluate newest first each pass; never bury new logs behind backlog.
-        item = next((item for item in items if item[1] > floor and done.get(item[0].name) != item[1]), None)
+        item = next((item for item in items if tracker.started(item[0].name) is not None and item[1] > floor and done.get(item[0].name) != item[1]), None)
         if item:
-          await transfer(client, base, *item, working)
+          await transfer(client, base, *item, working, generation=policy['generation'], started=tracker.started(item[0].name))
           done[item[0].name] = item[1]
           temporary = receipt.with_suffix('.tmp')
           temporary.write_text(json.dumps(done))
@@ -172,5 +218,6 @@ async def run(resolved, root=Path('/data/media/0/realdata'), state_root=Path('/d
           delay = 15
       except (aiohttp.ClientError, OSError, ValueError, KeyError, TimeoutError) as error:
         print('[Carrot HA logs] transfer deferred: ' + type(error).__name__, flush=True)
+        last_check = 0  # Refresh permission before another attempt, including HTTP 403.
         delay = min(max(15, delay * 2), 120)
       await asyncio.sleep(delay)
