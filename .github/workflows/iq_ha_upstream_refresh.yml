@@ -3,6 +3,7 @@ name: IQ HA upstream refresh
 # Keeps the iq-ha companion branch on the current IQpilot release (konn3kt). The builder lives in
 # helico717/carrot-ha; iq-ha is always its output for the pinned Carrot donor and one IQpilot commit.
 # Pushes only after the candidate tests pass; IQ.OS changes or broken port patches stop for review.
+# Results appear as run annotations (UP_TO_DATE, IDENTICAL, COMMITTED or NEEDS_REVIEW).
 on:
   schedule:
     - cron: '17 19 * * *'  # 04:17 KST daily
