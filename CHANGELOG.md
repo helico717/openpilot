@@ -1,0 +1,13 @@
+# Personal IQpilot HA candidate
+
+## 2026-11-02 — Initial installation candidate
+
+- Pinned IQpilot release 5c9291b9df6d90007d73ecd749b135bd5008e80d as an unmodified Git submodule.
+- Ported HA companion from the actual Carrot vehicle commit 5ec4868a12a9038547b373eb95be3a5fa86d30aa.
+- Preserved vehicle identity/configuration and HA outbox paths outside Git; paused Carrot-only parameter writes.
+- Added administrator reverse-terminal PTY without a Carrot local web server or new network listener.
+- Added separate parked-camera ownership and fail-closed IQ Sentry/Live View exclusion.
+- Added source/runtime diagnostics; no CAN actuation, camera startup or reboot in diagnostics.
+- Vendor binaries remain in the original pinned repository; public Python sources retain the upstream license.
+- Local validation: 10 source assembly checks and 33 functional checks pass. Linux CI/device/OS rollback status
+  is tracked in the companion helico717/carrot-ha preparation report. No vehicle installation performed.

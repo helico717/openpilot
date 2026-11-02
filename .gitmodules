@@ -1,0 +1,3 @@
+[submodule "iqpilot-vendor"]
+	path = vendor/iqpilot
+	url = https://git.konn3kt.com/IQ.Lvbs/IQPilot.git

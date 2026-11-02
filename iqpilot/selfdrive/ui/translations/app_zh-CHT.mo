@@ -1,0 +1,1 @@
+../../../../vendor/iqpilot/iqpilot/selfdrive/ui/translations/app_zh-CHT.mo

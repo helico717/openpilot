@@ -1,0 +1,26 @@
+name: IQ HA candidate validation
+on:
+  push:
+    branches: [iq-ha]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  companion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install aiohttp
+      - name: Source assembly and isolated PTY/camera guards
+        run: |
+          python -m iqpilot.selfdrive.carrot.ha.iq_preflight --source-only
+          python -m unittest discover -s tests -p 'test_iqpilot_*.py'
+      - name: Preserved archive and measurement contracts
+        run: |
+          for pattern in test_trip_measurements.py 'test_battery*.py' test_bms_actual.py 'test_charge*.py' test_outbox_lanes.py test_log_activation.py; do
+            python -m unittest discover -s iqpilot/selfdrive/carrot/ha/tests -p "$pattern" || exit 1
+          done
