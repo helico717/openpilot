@@ -86,7 +86,8 @@ async def prepare_video(video, working):
     return video
   binary = shutil.which('ffmpeg')
   if not binary:
-    raise OSError('ffmpeg is required to remux finalized qcamera for HA')
+    from .iq_video import prepare_video as av_prepare_video
+    return await av_prepare_video(video, working)
   output = working / 'qcamera.mp4'
   output.unlink(missing_ok=True)
   process = await asyncio.create_subprocess_exec(

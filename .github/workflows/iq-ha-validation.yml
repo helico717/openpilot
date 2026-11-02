@@ -7,14 +7,14 @@ permissions:
   contents: read
 jobs:
   companion:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - run: python -m pip install aiohttp
+      - run: python -m pip install aiohttp av
       - name: Source assembly and isolated PTY/camera guards
         run: |
           python -m iqpilot.selfdrive.carrot.ha.iq_preflight --source-only

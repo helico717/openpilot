@@ -46,7 +46,8 @@ def check_runtime(root):
         checks['camera_runtime_and_schema'] = True
     except Exception:
         checks['camera_runtime_and_schema'] = False
-    checks['video_remux'] = shutil.which('ffmpeg') is not None
+    import importlib.util
+    checks['video_remux'] = shutil.which('ffmpeg') is not None or importlib.util.find_spec('av') is not None
     checks['os_expected'] = Path('/VERSION').is_file() and Path('/VERSION').read_text().strip().startswith('IQ.OS 4.9.9.4')
     checks['ha_configuration_present'] = any(Path(path).is_file() for path in (
         '/data/id4-collector/connection.json', '/data/carrot_ha/connection.json', '/data/carrot_ha/direct-connection.json'))

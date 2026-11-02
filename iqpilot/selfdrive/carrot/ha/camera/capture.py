@@ -12,7 +12,7 @@ import threading
 import time
 
 ROOT = Path(__file__).resolve().parents[5]
-sys.path[:0] = [str(ROOT), str(ROOT / 'pydeps')]
+sys.path.insert(0, str(ROOT))
 
 from .protocol import MAX_PAYLOAD, encode_frame
 from .media import NalFrameAssembler

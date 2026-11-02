@@ -5,6 +5,7 @@ import importlib.util
 from pathlib import Path
 import sys
 import tempfile
+import re
 import types
 import unittest
 import uuid
@@ -54,10 +55,11 @@ class TerminalTests(unittest.IsolatedAsyncioTestCase):
                     'message': {'type': 'raw', 'data': "printf 'IQ_HA_PTY_OK\\n'\n"}})
                 for _ in range(100):
                     output = b''.join(base64.b64decode(item['message']['b64']) for item in remote.events if item['type'] == 'terminal')
-                    if b'\r\nIQ_HA_PTY_OK\r\n' in output:
+                    visible = re.sub(rb'\x1b\[[0-?]*[ -/]*[@-~]', b'', output).replace(b'\r', b'')
+                    if b'\nIQ_HA_PTY_OK\n' in visible:
                         break
                     await asyncio.sleep(0.02)
-                self.assertIn(b'\r\nIQ_HA_PTY_OK\r\n', output)
+                self.assertIn(b'\nIQ_HA_PTY_OK\n', visible)
                 with self.assertRaises(ValueError):
                     await agent.command(remote, {'type': 'input', 'session_id': session,
                         'message': {'type': 'raw', 'data': 'x' * 4097}})

@@ -1,1 +1,2 @@
-../../../../../vendor/iqpilot/iqpilot/selfdrive/controls/lib/longitudinal_mpc_lib/.gitignore
+acados_ocp_long.json
+c_generated_code/

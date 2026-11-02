@@ -1,1 +1,1 @@
-../../../vendor/iqpilot/iqpilot/selfdrive/iqmodeld/.gitignore
+*_pyx.cpp

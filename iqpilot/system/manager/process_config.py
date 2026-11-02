@@ -282,6 +282,11 @@ procs += [
 ]
 
 # Personal Carrot HA companion: preserve IQ driving process definitions.
+# The stock updater does not understand the pinned companion superproject.
+for companion_process in procs:
+  if companion_process.name == 'updated':
+    companion_process.enabled = False
+
 def carrot_ha_configured(started, params, CP):
   return not_low_power(started, params, CP) and any(os.path.isfile(path) for path in (
     '/data/id4-collector/connection.json', '/data/carrot_ha/connection.json',

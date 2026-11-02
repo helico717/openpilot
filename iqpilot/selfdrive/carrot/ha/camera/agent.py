@@ -171,7 +171,7 @@ class DeviceAgent:
 
 
 async def main(base=BASE):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[5] / 'pydeps'))
+    # Use the IQ runtime; never shadow it with legacy Carrot pydeps.
     import aiohttp
     config_path = base / 'camera.json'
     if config_path.stat().st_mode & 0o077:

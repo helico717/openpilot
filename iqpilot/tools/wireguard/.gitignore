@@ -1,1 +1,5 @@
-../../../vendor/iqpilot/iqpilot/tools/wireguard/.gitignore
+wireguard-go
+wg
+wg.env
+privatekey
+publickey

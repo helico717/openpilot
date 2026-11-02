@@ -77,7 +77,7 @@ def interrupted(signum, _frame):
 
 
 def run(root, timeout_binary, verify_decode=False):
-    sys.path[:0] = [str(root), str(root / "pydeps")]
+    sys.path.insert(0, str(root))
     from ..iq_camera import CameraParams as Params
     from iqpilot.cereal import messaging
 
