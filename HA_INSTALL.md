@@ -23,3 +23,13 @@ IQ settings remain on the device; there is no claimed IQ parameter editor in HA 
 and video reuse the existing upload API; Carrot-specific log analysis is not claimed compatible.
 IQ Sentry/Live View take precedence over the HA parked camera. No vehicle runtime tests have passed yet.
 Do not use an updater/branch selector to replace this companion branch with stock IQ inadvertently.
+
+The runtime diagnostics also print `carrot_return`. It checks, read-only, whether the inactive-slot
+partitions are writable by the Carrot OS flasher (IQ.OS removes owner root). Only
+`SOFTWARE_RETURN_POSSIBLE_UNVERIFIED` allows the software return; otherwise plan a recovery first.
+Return to the pinned Carrot commit with Git only (no force/reset/clean, stops on any conflict):
+
+    cd /data/openpilot
+    bash bootstrap/switch_to_carrot.sh
+
+Then reboot. Full owner procedure: carrot-ha docs/IQPILOT_HA_INSTALL_AND_RETURN.md.

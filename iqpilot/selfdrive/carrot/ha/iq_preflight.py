@@ -54,6 +54,38 @@ def check_runtime(root):
     return checks
 
 
+# Partitions in the pinned Carrot OS manifest (ha-back 5ec4868a, 19.8-carrot-bt1); all are A/B.
+CARROT_RETURN_PARTITIONS = ('xbl', 'xbl_config', 'abl', 'aop', 'devcfg', 'boot', 'system')
+
+
+def check_carrot_return(partition_root=Path('/dev/disk/by-partlabel')):
+    """Read-only estimate of whether the pinned Carrot launcher can reinstall Carrot OS from here.
+
+    Carrot's flasher writes inactive-slot partitions directly without sudo, while IQ.OS 4.9.9.2+
+    removes owner root. Nothing is opened for writing; abctl slot changes stay unverified.
+    """
+    result = {}
+    try:
+        current = subprocess.run(['abctl', '--boot_slot'], capture_output=True, text=True, timeout=5).stdout.strip()
+    except Exception:
+        current = ''
+    result['current_slot'] = current or None
+    target = {'_a': '_b', '_b': '_a'}.get(current)
+    blocked = []
+    for name in CARROT_RETURN_PARTITIONS:
+        path = partition_root / (name + (target or ''))
+        if target is None or not path.exists() or not os.access(os.path.realpath(path), os.W_OK):
+            blocked.append(name)
+    result['inactive_slot_partitions_writable'] = not blocked
+    result['blocked_partitions'] = blocked
+    try:
+        result['noninteractive_sudo'] = subprocess.run(['sudo', '-n', 'true'], capture_output=True, timeout=3).returncode == 0
+    except Exception:
+        result['noninteractive_sudo'] = False
+    result['verdict'] = 'SOFTWARE_RETURN_POSSIBLE_UNVERIFIED' if not blocked else 'SOFTWARE_RETURN_BLOCKED'
+    return result
+
+
 def check_source(root):
     manifest = json.loads((root / 'HA_CANDIDATE.json').read_text())
     expected = manifest['iqpilot_sha']
@@ -64,7 +96,7 @@ def check_source(root):
     checks['candidate_sources_intact'] = all(
         (root / name).is_file() and hashlib.sha256((root / name).read_bytes()).hexdigest() == digest
         for name, digest in manifest.get('candidate_source_sha256', {}).items()) and bool(manifest.get('candidate_source_sha256'))
-    for relative in ('launch_openpilot.sh', 'launch_chffrplus.sh', 'bootstrap/ensure_vendor.sh'):
+    for relative in ('launch_openpilot.sh', 'launch_chffrplus.sh', 'bootstrap/ensure_vendor.sh', 'bootstrap/switch_to_carrot.sh'):
         checks['shell_' + relative] = subprocess.run(['bash', '-n', str(root / relative)], capture_output=True).returncode == 0
     for directory in ('artifacts', 'iqpilot/selfdrive/assets', 'iqpilot/third_party'):
         path = root / directory
@@ -79,11 +111,14 @@ def main():
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[4]
     checks = check_source(root)
+    report = {}
     if not args.source_only:
         checks.update(check_runtime(root))
+        # Reported separately: it decides the return path, not whether IQ itself is usable.
+        report['carrot_return'] = check_carrot_return()
     passed = all(checks.values())
     print(json.dumps({'stage': 'SOURCE_ONLY' if args.source_only else 'LOCAL_RUNTIME',
-                      'passed': passed, 'checks': checks, 'field_test_required': True}, indent=2))
+                      'passed': passed, 'checks': checks, **report, 'field_test_required': True}, indent=2))
     return 0 if passed else 1
 
 

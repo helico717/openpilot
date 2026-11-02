@@ -15,3 +15,10 @@
   controls before checking the actual standalone output line. Git ignore files are regular tracked files.
 - Stock automatic source updating is disabled; companion updates use this Git branch only.
 - Finalized camera TS remux can use IQpilot's PyAV when the ffmpeg command is unavailable.
+
+## 2026-11-02 — Carrot return readiness
+
+- Diagnostics report read-only inactive-slot write access for the Carrot OS flasher and sudo availability.
+- Added a Git-only return script to the pinned Carrot commit; it refuses onroad, local tracked
+  changes, an unexpected ha-back commit and untracked collisions, and never reboots.
+- Not yet tried on a device; the IQ.OS -> Carrot OS flash remains unverified.
