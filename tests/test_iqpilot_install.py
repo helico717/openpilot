@@ -59,6 +59,18 @@ class InstallTests(unittest.TestCase):
         self.assertEqual(git(self.repo,'rev-parse','--abbrev-ref','@{u}'),'origin/iq-ha')
         self.assertFalse((self.repo/'.git/modules/iqpilot-vendor/objects/info/alternates').exists())
 
+    def test_only_python_cache_collisions_can_be_preserved(self):
+        cache=self.repo/'artifacts/__pycache__/module.cpython-312.pyc'
+        cache.parent.mkdir(parents=True);cache.write_bytes(b'cached runtime')
+        other=self.repo/'artifacts/settings.json';other.write_text('user state')
+        with self.assertRaises(ValueError):
+            module.preserve_python_caches(self.repo,[str(cache.relative_to(self.repo)),str(other.relative_to(self.repo))],self.base)
+        self.assertTrue(cache.exists());self.assertTrue(other.exists())
+        module.preserve_python_caches(self.repo,[str(cache.relative_to(self.repo))],self.base)
+        self.assertFalse(cache.exists());self.assertTrue(other.exists())
+        backups=list(self.base.glob('iq-ha-python-cache-*'))
+        self.assertEqual((backups[0]/cache.relative_to(self.repo)).read_bytes(),b'cached runtime')
+
     def test_restricted_origin_fetch_and_plain_checkout(self):
         real = module.git
         calls = []

@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import tempfile
 
 ORIGIN = 'https://github.com/helico717/openpilot.git'
 
@@ -20,6 +21,24 @@ def git(repo, *args):
 def parked(params):
     if ((params / 'IsOffroad').read_text().strip(), (params / 'IsOnroad').read_text().strip()) != ('1', '0'):
         raise ValueError('Explicit offroad state required')
+
+
+def preserve_python_caches(repo, paths, backup_parent):
+    """Preserve only regenerable __pycache__/*.pyc collisions, never user data."""
+    repo = Path(repo).resolve()
+    for relative in paths:
+        path = repo / relative
+        if ('__pycache__' not in Path(relative).parts or path.suffix != '.pyc'
+                or path.is_symlink() or not path.is_file() or not path.resolve().is_relative_to(repo)):
+            raise ValueError('Non-cache untracked/ignored file collision; refusing without removing files')
+    if not paths:
+        return
+    backup = Path(tempfile.mkdtemp(prefix='iq-ha-python-cache-', dir=backup_parent))
+    for relative in paths:
+        target = backup / relative
+        target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        (repo / relative).rename(target)
+    print('PYTHON_CACHES_PRESERVED', len(paths), str(backup))
 
 
 def prepare_vendor(stage, repo=Path('/data/openpilot')):
@@ -98,11 +117,13 @@ def activate(stage, repo=Path('/data/openpilot'), params=Path('/data/params/d'),
         tracked = set(git(stage, 'ls-tree', '-r', '--name-only', 'HEAD').splitlines())
         untracked = git(repo, 'ls-files', '--others', '--exclude-standard').splitlines()
         untracked += git(repo, 'ls-files', '--others', '--ignored', '--exclude-standard').splitlines()
+        collisions = []
         for path in untracked:
             if path == '.iqpilot' or path.startswith('.iqpilot/'):
                 continue  # Explicitly preserved below, never discarded.
             if any(path == target or path.startswith(target + '/') or target.startswith(path + '/') for target in tracked):
-                raise ValueError('Untracked/ignored file collision; refusing without removing files')
+                collisions.append(path)
+        preserve_python_caches(repo, sorted(set(collisions)), runtime.parent)
     else:
         git(repo, 'fetch', '--no-tags', str(stage), candidate_sha)
     parked(params)
