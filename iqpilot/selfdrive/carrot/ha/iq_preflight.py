@@ -58,13 +58,14 @@ def check_runtime(root):
 CARROT_RETURN_PARTITIONS = ('xbl', 'xbl_config', 'abl', 'aop', 'devcfg', 'boot', 'system')
 
 
-def check_carrot_return(partition_root=Path('/dev/disk/by-partlabel')):
+def check_carrot_return(partition_root=Path('/dev/disk/by-partlabel'), agnos_marker=Path('/AGNOS')):
     """Read-only estimate of whether the pinned Carrot launcher can reinstall Carrot OS from here.
 
     Carrot's flasher writes inactive-slot partitions directly without sudo, while IQ.OS 4.9.9.2+
     removes owner root. Nothing is opened for writing; abctl slot changes stay unverified.
     """
-    result = {}
+    # The Carrot launcher runs its OS reinstall only when this marker exists.
+    result = {'agnos_marker': agnos_marker.is_file()}
     try:
         current = subprocess.run(['abctl', '--boot_slot'], capture_output=True, text=True, timeout=5).stdout.strip()
     except Exception:
@@ -82,7 +83,8 @@ def check_carrot_return(partition_root=Path('/dev/disk/by-partlabel')):
         result['noninteractive_sudo'] = subprocess.run(['sudo', '-n', 'true'], capture_output=True, timeout=3).returncode == 0
     except Exception:
         result['noninteractive_sudo'] = False
-    result['verdict'] = 'SOFTWARE_RETURN_POSSIBLE_UNVERIFIED' if not blocked else 'SOFTWARE_RETURN_BLOCKED'
+    possible = not blocked and result['agnos_marker']
+    result['verdict'] = 'SOFTWARE_RETURN_POSSIBLE_UNVERIFIED' if possible else 'SOFTWARE_RETURN_BLOCKED'
     return result
 
 

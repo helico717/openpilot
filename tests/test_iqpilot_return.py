@@ -18,12 +18,15 @@ def git(cwd, *args):
 
 
 class ReturnReadinessTests(unittest.TestCase):
-    def run_check(self, slot, writable):
+    def run_check(self, slot, writable, marker=True):
         with tempfile.TemporaryDirectory() as directory:
             folder = Path(directory)
             bin_dir, parts = folder / 'bin', folder / 'parts'
             bin_dir.mkdir()
             parts.mkdir()
+            agnos = folder / 'AGNOS'
+            if marker:
+                agnos.write_text('')
             (bin_dir / 'abctl').write_text(f'#!/bin/sh\necho {slot}\n')
             (bin_dir / 'abctl').chmod(0o755)
             for name in preflight.CARROT_RETURN_PARTITIONS:
@@ -34,7 +37,7 @@ class ReturnReadinessTests(unittest.TestCase):
             path = os.environ['PATH']
             os.environ['PATH'] = f'{bin_dir}{os.pathsep}{path}'
             try:
-                return preflight.check_carrot_return(parts)
+                return preflight.check_carrot_return(parts, agnos)
             finally:
                 os.environ['PATH'] = path
 
@@ -49,6 +52,11 @@ class ReturnReadinessTests(unittest.TestCase):
         result = self.run_check('_b', False)
         self.assertEqual(result['verdict'], 'SOFTWARE_RETURN_BLOCKED')
         self.assertEqual(result['blocked_partitions'], list(preflight.CARROT_RETURN_PARTITIONS))
+
+    def test_missing_agnos_marker_blocks_return(self):
+        result = self.run_check('_a', True, marker=False)
+        self.assertFalse(result['agnos_marker'])
+        self.assertEqual(result['verdict'], 'SOFTWARE_RETURN_BLOCKED')
 
     def test_unknown_slot_blocks_return(self):
         self.assertEqual(self.run_check('', True)['verdict'], 'SOFTWARE_RETURN_BLOCKED')

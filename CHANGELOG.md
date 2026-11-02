@@ -18,7 +18,8 @@
 
 ## 2026-11-02 — Carrot return readiness
 
-- Diagnostics report read-only inactive-slot write access for the Carrot OS flasher and sudo availability.
+- Diagnostics report read-only inactive-slot write access for the Carrot OS flasher, the /AGNOS
+  marker the Carrot launcher requires for its OS reinstall, and sudo availability.
 - Added a Git-only return script to the pinned Carrot commit; it refuses onroad, local tracked
   changes, an unexpected ha-back commit and untracked collisions, and never reboots.
 - Not yet tried on a device; the IQ.OS -> Carrot OS flash remains unverified.

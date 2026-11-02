@@ -190,7 +190,7 @@
       "adapter_sha256": "a71dce202283d86825c602ab2895b787563aba215d4c1f3918e5de446f34672e"
     },
     "iqpilot/selfdrive/carrot/ha/iq_preflight.py": {
-      "adapter_sha256": "71b6d415ec3fb9f9f7e697594d3f1d17ac5ac5f77a47a2681aeacabd53f56264"
+      "adapter_sha256": "000bb3d3cd6753a143a6a3210b47017fac61ff942ced6424e02707cd89cb412b"
     },
     "iqpilot/selfdrive/carrot/ha/iq_video.py": {
       "adapter_sha256": "abe227a7b930a548bc1340c64adf664934f47ed4fdee5e3e13f506193b14d1c5"
@@ -1273,7 +1273,7 @@
   "candidate_source_sha256": {
     "LICENSE": "6712bf674ed34fb07221c869fe84950de95f614ca4cf05c5cbc1f91929311989",
     "uv.lock": "81e68c055bea5ec06163a9c55965ead305cd650d17c23565e91b0428ebb7d184",
-    "CHANGELOG.md": "df1897732487fb345226faf37ee53ee56b0b4f30d55c0bc72cadc452a46530b7",
+    "CHANGELOG.md": "0e04a30afa9cb4a2cb400b3f46821daf4181a63b9c7ed9952a0e484a864db0e6",
     "HA_INSTALL.md": "2b1c42707ca8dadf4c331427e6fb17e91eaff38ce9399dea3b7ff23c8bc960f1",
     "pyproject.toml": "1d63fa9c1a9b1145636112858fa47e832ae817d56430a4b320191beb02b994b4",
     "launch_openpilot.sh": "83d7adce49cfd6c48bae8394bfae3fa3f3796ccb1d8afa0772b8b457696debf7",
@@ -1289,7 +1289,7 @@
     "bootstrap/ensure_vendor.sh": "b0525205cfd4ec8b340a031946f30465f89a029e50f0c22d846de65538e8a856",
     "bootstrap/switch_to_carrot.sh": "94a6c66a38a0155c036397661766b9a60e04cdb1d2957ffaeed51c818b88a275",
     "tests/test_iqpilot_video.py": "325f11798cac1381205de0c8d8561e9283c9fc0d754457a86c8097695161889c",
-    "tests/test_iqpilot_return.py": "af4e330e078bd062ebe391e49a4d89a43dbb18ebd149cfc8e6edbe75ea08cd1a",
+    "tests/test_iqpilot_return.py": "1b568c3e89c8eb5ab584d75cec11161e49465a5be8616e7778fadfc993f9a4e1",
     "tests/test_iqpilot_terminal.py": "1f6c3820835824c55013d558e7941d6c37566057b1cf17dc29c452e97b97dfc1",
     "tests/test_iqpilot_camera.py": "921a4a60a64f3840dcb4287cf85e88820c8e80d146cbca0041111df226172d89",
     "iqpilot/__init__.py": "4e04955925838fc46fdc8ddf8650aed2fac0fd35da72abb638a841e72c91fdbd",
@@ -1896,7 +1896,7 @@
     "iqpilot/selfdrive/monitoring/dmonitoringd.py": "9b2ca6fce1d789df40ecf065c412c5aab76f1fc4640e4b33fad000c85317f517",
     "iqpilot/selfdrive/monitoring/helpers.py": "8e9c5add2aa6e5e2c8955b754c81d3efe297cad5aaf43533c42fffd7d4a717de",
     "iqpilot/selfdrive/carrot/ha/wayon_vehicle_telemetry.py": "451573bbca6afd1813b0f7aac5fa7c0e8f5f2524ba7a382f4c32d20afb3fe728",
-    "iqpilot/selfdrive/carrot/ha/iq_preflight.py": "71b6d415ec3fb9f9f7e697594d3f1d17ac5ac5f77a47a2681aeacabd53f56264",
+    "iqpilot/selfdrive/carrot/ha/iq_preflight.py": "000bb3d3cd6753a143a6a3210b47017fac61ff942ced6424e02707cd89cb412b",
     "iqpilot/selfdrive/carrot/ha/iq_camera.py": "a71dce202283d86825c602ab2895b787563aba215d4c1f3918e5de446f34672e",
     "iqpilot/selfdrive/carrot/ha/terminal.py": "4d2d5d77e4a4fc6e48b29c2b212ed52e9251b0aeb72a4f36f04baa643d8dd0f2",
     "iqpilot/selfdrive/carrot/ha/direct_connection.py": "f4dc73413763767970f17076413be207aa396c125477c7855dfef05000b57d64",
