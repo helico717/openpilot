@@ -190,7 +190,7 @@
       "adapter_sha256": "a71dce202283d86825c602ab2895b787563aba215d4c1f3918e5de446f34672e"
     },
     "iqpilot/selfdrive/carrot/ha/iq_preflight.py": {
-      "adapter_sha256": "000bb3d3cd6753a143a6a3210b47017fac61ff942ced6424e02707cd89cb412b"
+      "adapter_sha256": "85f1752b4d99c250c6a9349e1f3d7d6e77aa9899632f092f578f48c6bba7cef8"
     },
     "iqpilot/selfdrive/carrot/ha/iq_video.py": {
       "adapter_sha256": "abe227a7b930a548bc1340c64adf664934f47ed4fdee5e3e13f506193b14d1c5"
@@ -1273,7 +1273,7 @@
   "candidate_source_sha256": {
     "LICENSE": "6712bf674ed34fb07221c869fe84950de95f614ca4cf05c5cbc1f91929311989",
     "uv.lock": "81e68c055bea5ec06163a9c55965ead305cd650d17c23565e91b0428ebb7d184",
-    "CHANGELOG.md": "0e04a30afa9cb4a2cb400b3f46821daf4181a63b9c7ed9952a0e484a864db0e6",
+    "CHANGELOG.md": "383fe7ab72684b861f70b32e2226c2c3e7f59841fe80d7a129a31d7dbe8fb44d",
     "HA_INSTALL.md": "2b1c42707ca8dadf4c331427e6fb17e91eaff38ce9399dea3b7ff23c8bc960f1",
     "pyproject.toml": "1d63fa9c1a9b1145636112858fa47e832ae817d56430a4b320191beb02b994b4",
     "launch_openpilot.sh": "83d7adce49cfd6c48bae8394bfae3fa3f3796ccb1d8afa0772b8b457696debf7",
@@ -1896,7 +1896,7 @@
     "iqpilot/selfdrive/monitoring/dmonitoringd.py": "9b2ca6fce1d789df40ecf065c412c5aab76f1fc4640e4b33fad000c85317f517",
     "iqpilot/selfdrive/monitoring/helpers.py": "8e9c5add2aa6e5e2c8955b754c81d3efe297cad5aaf43533c42fffd7d4a717de",
     "iqpilot/selfdrive/carrot/ha/wayon_vehicle_telemetry.py": "451573bbca6afd1813b0f7aac5fa7c0e8f5f2524ba7a382f4c32d20afb3fe728",
-    "iqpilot/selfdrive/carrot/ha/iq_preflight.py": "000bb3d3cd6753a143a6a3210b47017fac61ff942ced6424e02707cd89cb412b",
+    "iqpilot/selfdrive/carrot/ha/iq_preflight.py": "85f1752b4d99c250c6a9349e1f3d7d6e77aa9899632f092f578f48c6bba7cef8",
     "iqpilot/selfdrive/carrot/ha/iq_camera.py": "a71dce202283d86825c602ab2895b787563aba215d4c1f3918e5de446f34672e",
     "iqpilot/selfdrive/carrot/ha/terminal.py": "4d2d5d77e4a4fc6e48b29c2b212ed52e9251b0aeb72a4f36f04baa643d8dd0f2",
     "iqpilot/selfdrive/carrot/ha/direct_connection.py": "f4dc73413763767970f17076413be207aa396c125477c7855dfef05000b57d64",

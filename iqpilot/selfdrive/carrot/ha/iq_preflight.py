@@ -32,6 +32,12 @@ def check_runtime(root):
     except Exception:
         checks['params_keys'] = False
     try:
+        from iqpilot.common.params import Params
+        # Deep standby stops the HA companion while parked; the owner runs with FastSleep off.
+        checks['fast_sleep_off'] = not Params().get_bool('FastSleep')
+    except Exception:
+        checks['fast_sleep_off'] = False
+    try:
         from iqdbc.can.parser import CANParser
         required = [('Motor_16', 2), ('HVEM_02', 10), ('MEB_HVEM_01', 100), ('BMS_04', 2),
                     ('Diagnose_01', 1), ('Klima_Sensor_02', 1), ('Klima_11', 5), ('Klima_12', 5)]
