@@ -1,1 +1,0 @@
-../../../../../vendor/iqpilot/iqpilot/selfdrive/controls/lib/neural_network_feed_forward/README.md

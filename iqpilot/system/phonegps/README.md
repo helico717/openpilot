@@ -1,1 +1,0 @@
-../../../vendor/iqpilot/iqpilot/system/phonegps/README.md

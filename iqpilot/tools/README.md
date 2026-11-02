@@ -1,1 +1,0 @@
-../../vendor/iqpilot/iqpilot/tools/README.md

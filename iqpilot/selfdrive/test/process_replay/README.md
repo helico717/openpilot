@@ -1,1 +1,0 @@
-../../../../vendor/iqpilot/iqpilot/selfdrive/test/process_replay/README.md

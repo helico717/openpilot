@@ -1,1 +1,0 @@
-../../vendor/iqpilot/iqpilot/cereal/README.md

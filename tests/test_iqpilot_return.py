@@ -17,6 +17,20 @@ def git(cwd, *args):
     return subprocess.run(['git', '-C', str(cwd), *args], check=True, capture_output=True, text=True).stdout.strip()
 
 
+class OSVersionTests(unittest.TestCase):
+    def test_manifest_version_exact_match_and_missing_rejection(self):
+        import json
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            version = root / 'VERSION'
+            (root / 'HA_CANDIDATE.json').write_text(json.dumps({'required_os':'4.9.9.9.2'}))
+            for actual, expected in [('IQ.OS 4.9.9.9.2\n', True), ('IQ.OS 4.9.9.4', False), ('IQ.OS 4.9.9.9.20', False)]:
+                version.write_text(actual)
+                self.assertEqual(preflight.os_matches(root,version), expected)
+            version.unlink()
+            self.assertFalse(preflight.os_matches(root,version))
+
+
 class ReturnReadinessTests(unittest.TestCase):
     def run_check(self, slot, writable, marker=True):
         with tempfile.TemporaryDirectory() as directory:

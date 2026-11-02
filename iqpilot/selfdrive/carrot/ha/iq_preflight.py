@@ -10,6 +10,14 @@ import subprocess
 import sys
 
 
+def os_matches(root, version_path=Path('/VERSION')):
+    try:
+        expected = json.loads((root / 'HA_CANDIDATE.json').read_text())['required_os']
+        return bool(expected) and version_path.read_text().strip().removeprefix('IQ.OS ') == expected
+    except (OSError, ValueError, KeyError):
+        return False
+
+
 def check_runtime(root):
     checks = {}
     checks['arm64'] = platform.machine() in ('aarch64', 'arm64') and sys.platform == 'linux'
@@ -39,10 +47,13 @@ def check_runtime(root):
         checks['fast_sleep_off'] = False
     try:
         from iqdbc.can.parser import CANParser
+        dbc = str(Path(__file__).with_name('dbc') / 'vw_meb.dbc')
         required = [('Motor_16', 2), ('HVEM_02', 10), ('MEB_HVEM_01', 100), ('BMS_04', 2),
                     ('Diagnose_01', 1), ('Klima_Sensor_02', 1), ('Klima_11', 5), ('Klima_12', 5)]
         for bus in (0, 1):
-            CANParser('vw_meb', required, bus)
+            parser = CANParser(dbc, required, bus)
+            if 'Battery_Voltage_02' not in parser.vl['MEB_HVEM_01']:
+                raise ValueError('HA MEB voltage signal unavailable')
         checks['meb_can_parsers'] = True
     except Exception:
         checks['meb_can_parsers'] = False
@@ -54,7 +65,8 @@ def check_runtime(root):
         checks['camera_runtime_and_schema'] = False
     import importlib.util
     checks['video_remux'] = shutil.which('ffmpeg') is not None or importlib.util.find_spec('av') is not None
-    checks['os_expected'] = Path('/VERSION').is_file() and Path('/VERSION').read_text().strip().startswith('IQ.OS 4.9.9.4')
+    # Exact version supplied by the assembled candidate, never a stale hardcoded prefix.
+    checks['os_expected'] = os_matches(root)
     checks['ha_configuration_present'] = any(Path(path).is_file() for path in (
         '/data/id4-collector/connection.json', '/data/carrot_ha/connection.json', '/data/carrot_ha/direct-connection.json'))
     return checks

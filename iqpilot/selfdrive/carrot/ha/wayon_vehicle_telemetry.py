@@ -16,6 +16,7 @@ import json
 import os
 import time
 from pathlib import Path
+HA_MEB_DBC = str(Path(__file__).with_name('dbc') / 'vw_meb.dbc')
 
 import requests
 
@@ -191,7 +192,7 @@ def sample_vehicle_can(timeout_s: float = 6.0) -> dict:
           ("Klima_11", 5), ("Klima_12", 5)]
   try:
     from iqdbc.can.parser import CANParser
-    parsers = [CANParser("vw_meb", MSGS, bus) for bus in (0, 1)]
+    parsers = [CANParser(HA_MEB_DBC, MSGS, bus) for bus in (0, 1)]
   except Exception as exc:
     print(f"Wayon telemetry: CAN parser unavailable: {exc}", flush=True)
     return result
@@ -203,14 +204,14 @@ def sample_vehicle_can(timeout_s: float = 6.0) -> dict:
     supported = []
     for message in OPTIONAL_MESSAGES:
       try:
-        CANParser("vw_meb", [(message, 0)], 0)
+        CANParser(HA_MEB_DBC, [(message, 0)], 0)
         supported.append((message, 0))
       except Exception:
         pass
     if supported:
       for bus in (0, 1):
         try:
-          _OPTIONAL_PARSERS.append(CANParser("vw_meb", supported, bus))
+          _OPTIONAL_PARSERS.append(CANParser(HA_MEB_DBC, supported, bus))
         except Exception:
           pass
 

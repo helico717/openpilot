@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-expected=5c9291b9df6d90007d73ecd749b135bd5008e80d
+expected=11fcd74243ede4f1f5df24db1ed2d44e2ac22664
 cd "$root"
 if [ -e vendor/iqpilot/.git ]; then
   git -C vendor/iqpilot diff --quiet

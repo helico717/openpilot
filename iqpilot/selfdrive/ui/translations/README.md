@@ -1,1 +1,0 @@
-../../../../vendor/iqpilot/iqpilot/selfdrive/ui/translations/README.md

@@ -1,1 +1,0 @@
-../../../vendor/iqpilot/iqpilot/tools/maneuvers/README-longitudinal.md
