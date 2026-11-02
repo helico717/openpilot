@@ -1293,8 +1293,9 @@
     "README.md": "5f8dd957844d87a881823f7b27b74fd4d7551b1638a98ce692ac9d6f111f91e0",
     "SECURITY.md": "6850d393cc32eea28f1dd7a74651c4154bd0c2c0d0924c3606d268c4594669b5",
     "bootstrap/ensure_vendor.sh": "bf98f5f948e80587317ec7413cfc0989258adf179a422d42d75b796c8bf9cebf",
-    "bootstrap/install_from_stock.py": "2c5fa07fe5312122cecb7493f914f65539a2ff3b272a8bc9cc0f3d7f257f6b72",
+    "bootstrap/install_from_stock.py": "736646d89bf5f262ccda96274a26db46199113c575d9c1823224482da7cd4113",
     "bootstrap/switch_to_carrot.sh": "2d56a8dba3bbca5a36f70ac480969bd804ac87ba8b3c4d6621aec12fb57ff8da",
+    "bootstrap/update_iq_ha.py": "3b193c25ec3bfd137049a70041e207ea69c1d81551e5e1a88dbcab3fb0befc93",
     "iqpilot/__init__.py": "4e04955925838fc46fdc8ddf8650aed2fac0fd35da72abb638a841e72c91fdbd",
     "iqpilot/cereal/__init__.py": "3dd999502d70d3827047a615bdb1e411c73d6959ee779eeb9909ff348a1dbb56",
     "iqpilot/cereal/custom.capnp": "a199be68d5ec4cf729e9c05cc971172b660a0eaa65bf67ee24d0a7f90d6c2d35",
@@ -2302,10 +2303,11 @@
     "tests/fetch_iqpilot_can_runtime.py": "3962aeaeaa93ca750c3e9eca37b91873ddece88c94a97e3f2d6715c56d24d51d",
     "tests/test_iqpilot_camera.py": "921a4a60a64f3840dcb4287cf85e88820c8e80d146cbca0041111df226172d89",
     "tests/test_iqpilot_can_contract.py": "04dc774eac5975806a0040bc91467288cd04ea23cf79fa904e5b3a16d0724148",
-    "tests/test_iqpilot_install.py": "b594bb1f88271575a67a93c194a31abc43d75aeb42f028f24485b3f3bd7189fb",
+    "tests/test_iqpilot_install.py": "0953217bd6ed54d8d607f74fabb742d172762970471cf7c965504a55f4c2e8ac",
     "tests/test_iqpilot_restore.py": "cf60d6cb3fd6bdeafaa9ef98502fe92824f556ca7704d2e414ec0355191252d4",
     "tests/test_iqpilot_return.py": "c3f4948d964732291d8ecaae1d798e4a03a1ff9bc74cd217970aaf7d258b9d44",
     "tests/test_iqpilot_terminal.py": "1f6c3820835824c55013d558e7941d6c37566057b1cf17dc29c452e97b97dfc1",
+    "tests/test_iqpilot_update.py": "af779abbf9fac75698b22b9a612cc360ccaa94f7f7ab76ebef72efec7c2a6196",
     "tests/test_iqpilot_video.py": "325f11798cac1381205de0c8d8561e9283c9fc0d754457a86c8097695161889c",
     "uv.lock": "608366cb2bda9ac9131c01308855c011e914a00d84d40e995ba0d4ef111ca7ee"
   }

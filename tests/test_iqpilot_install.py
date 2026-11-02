@@ -46,9 +46,9 @@ class InstallTests(unittest.TestCase):
 
     def tearDown(self):self.temp.cleanup()
 
-    def activate(self):
+    def activate(self, restricted=False):
         with patch.object(module,'ORIGIN',str(self.stage)),patch.dict(os.environ,{'GIT_ALLOW_PROTOCOL':'file'}):
-            module.activate(self.stage,self.repo,self.params,self.version,self.runtime)
+            module.activate(self.stage,self.repo,self.params,self.version,self.runtime,restricted=restricted)
 
     def test_git_activation_preserves_runtime_and_origin_tracking(self):
         self.activate()
@@ -58,6 +58,21 @@ class InstallTests(unittest.TestCase):
         self.assertEqual(git(self.repo,'status','--porcelain','--untracked-files=no'),'')
         self.assertEqual(git(self.repo,'rev-parse','--abbrev-ref','@{u}'),'origin/iq-ha')
         self.assertFalse((self.repo/'.git/modules/iqpilot-vendor/objects/info/alternates').exists())
+
+    def test_restricted_origin_fetch_and_plain_checkout(self):
+        real = module.git
+        calls = []
+        def guarded(repo,*args):
+            calls.append(args)
+            if Path(repo).resolve() == self.repo.resolve() and args[0] in ('fetch','checkout'):
+                if args[0] == 'fetch':self.assertEqual(args,('fetch','origin'))
+                else:self.assertEqual(args,('checkout','iq-ha'))
+            return real(repo,*args)
+        with patch.object(module,'git',side_effect=guarded):
+            self.activate(restricted=True)
+        self.assertEqual(git(self.repo,'branch','--show-current'),'iq-ha')
+        self.assertEqual(git(self.repo,'config','--get-all','remote.origin.fetch'),'+refs/heads/iq-ha:refs/remotes/origin/iq-ha')
+        self.assertTrue((self.runtime/'cache').exists())
 
     def test_vendor_prepare_accepts_shallow_stock_and_is_independent(self):
         import shutil

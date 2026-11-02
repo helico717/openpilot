@@ -68,13 +68,43 @@ def validate(stage, repo, params, version):
 
 
 def activate(stage, repo=Path('/data/openpilot'), params=Path('/data/params/d'),
-             version=Path('/VERSION'), runtime=Path('/data/iqpilot-ha-runtime')):
+             version=Path('/VERSION'), runtime=Path('/data/iqpilot-ha-runtime'), restricted=None):
     stage, repo = Path(stage).resolve(), Path(repo).resolve()
     if stage == repo:
         raise ValueError('Run from a separate fully initialized candidate clone')
     validate(stage, repo, params, version)
     candidate_sha = git(stage, 'rev-parse', 'HEAD')
-    git(repo, 'fetch', '--no-tags', str(stage), candidate_sha)
+    if restricted is None:
+        restricted = Path('/usr/libexec/iqos/iq-git-update').is_file()
+    if restricted:
+        # The stock IQ.OS interface accepts only fetch/pull [origin] and
+        # checkout <ref>. Use that interface; never bypass its wrapper.
+        old_url = git(repo, 'remote', 'get-url', 'origin')
+        old_fetch = git(repo, 'config', '--get-all', 'remote.origin.fetch').splitlines()
+        try:
+            git(repo, 'remote', 'set-url', 'origin', ORIGIN)
+            git(repo, 'config', '--replace-all', 'remote.origin.fetch',
+                '+refs/heads/iq-ha:refs/remotes/origin/iq-ha')
+            git(repo, 'fetch', 'origin')
+            if git(repo, 'rev-parse', 'refs/remotes/origin/iq-ha') != candidate_sha:
+                raise ValueError('Published candidate changed; update and validate the staging clone first')
+        except Exception:
+            git(repo, 'remote', 'set-url', 'origin', old_url)
+            for index, value in enumerate(old_fetch):
+                git(repo, 'config', '--replace-all' if index == 0 else '--add', 'remote.origin.fetch', value)
+            raise
+        # The helper cannot accept --no-overwrite-ignore. Check ignored and
+        # ordinary untracked collisions ourselves, before changing any files.
+        tracked = set(git(stage, 'ls-tree', '-r', '--name-only', 'HEAD').splitlines())
+        untracked = git(repo, 'ls-files', '--others', '--exclude-standard').splitlines()
+        untracked += git(repo, 'ls-files', '--others', '--ignored', '--exclude-standard').splitlines()
+        for path in untracked:
+            if path == '.iqpilot' or path.startswith('.iqpilot/'):
+                continue  # Explicitly preserved below, never discarded.
+            if any(path == target or path.startswith(target + '/') or target.startswith(path + '/') for target in tracked):
+                raise ValueError('Untracked/ignored file collision; refusing without removing files')
+    else:
+        git(repo, 'fetch', '--no-tags', str(stage), candidate_sha)
     parked(params)
     cache = repo / '.iqpilot'
     migrated = False
@@ -85,7 +115,11 @@ def activate(stage, repo=Path('/data/openpilot'), params=Path('/data/params/d'),
         cache.rename(runtime)
         migrated = True
     try:
-        git(repo, 'checkout', '--no-overwrite-ignore', '--no-recurse-submodules', '-b', 'iq-ha', candidate_sha)
+        if restricted:
+            git(repo, 'branch', 'iq-ha', candidate_sha)
+            git(repo, 'checkout', 'iq-ha')
+        else:
+            git(repo, 'checkout', '--no-overwrite-ignore', '--no-recurse-submodules', '-b', 'iq-ha', candidate_sha)
     except subprocess.CalledProcessError:
         if migrated and not cache.exists() and not cache.is_symlink():
             runtime.rename(cache)
@@ -97,7 +131,8 @@ def activate(stage, repo=Path('/data/openpilot'), params=Path('/data/params/d'),
     url = git(stage, 'config', '-f', '.gitmodules', '--get', 'submodule.iqpilot-vendor.url')
     git(repo / 'vendor/iqpilot', 'remote', 'set-url', 'origin', url)
     git(repo, 'remote', 'set-url', 'origin', ORIGIN)
-    git(repo, 'fetch', '--no-tags', 'origin', 'refs/heads/iq-ha:refs/remotes/origin/iq-ha')
+    if not restricted:
+        git(repo, 'fetch', '--no-tags', 'origin', 'refs/heads/iq-ha:refs/remotes/origin/iq-ha')
     git(repo, 'branch', '--set-upstream-to=origin/iq-ha', 'iq-ha')
     if git(repo, 'rev-parse', 'HEAD') != candidate_sha or git(repo, 'status', '--porcelain', '--untracked-files=no'):
         raise ValueError('Installed checkout is not the exact clean candidate')
