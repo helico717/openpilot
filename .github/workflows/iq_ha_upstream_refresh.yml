@@ -6,6 +6,10 @@ name: IQ HA upstream refresh
 on:
   schedule:
     - cron: '17 19 * * *'  # 04:17 KST daily
+  # Editing this workflow runs a self-check: forced rebuild, never pushed (expect IDENTICAL).
+  push:
+    branches: [carrot-wip]
+    paths: ['.github/workflows/iq_ha_upstream_refresh.yml']
   workflow_dispatch:
     inputs:
       force:
@@ -50,14 +54,14 @@ jobs:
       - name: Rebuild on the IQpilot release and test
         id: refresh
         env:
-          FORCE: ${{ inputs.force && '--force' || '' }}
+          FORCE: ${{ (inputs.force || github.event_name == 'push') && '--force' || '' }}
         run: python -u builder/scripts/refresh_iq_ha.py --candidate candidate $FORCE
       - name: Push to iq-ha
-        if: steps.refresh.outputs.result == 'COMMITTED' && inputs.dry_run != true
+        if: steps.refresh.outputs.result == 'COMMITTED' && inputs.dry_run != true && github.event_name != 'push'
         working-directory: candidate
         run: git push origin HEAD:refs/heads/iq-ha
       - name: Record a validation run on the new commit
-        if: steps.refresh.outputs.result == 'COMMITTED' && inputs.dry_run != true
+        if: steps.refresh.outputs.result == 'COMMITTED' && inputs.dry_run != true && github.event_name != 'push'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run iq-ha-validation.yml --ref iq-ha -R "$GITHUB_REPOSITORY"
