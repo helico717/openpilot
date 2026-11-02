@@ -11,9 +11,22 @@ main() {
   root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
   cd "$root"
 
-  if [ "$(cat "$params/IsOnroad" 2>/dev/null)" = "1" ]; then
+  # Proceed only when parked is positively known: IsOffroad=1 and IsOnroad=0.
+  # Missing or unreadable state (e.g. during boot) refuses unless the owner explicitly confirms
+  # --confirm-parked when asked to in recovery; an onroad report always refuses.
+  local offroad onroad
+  offroad=$(cat "$params/IsOffroad" 2>/dev/null || echo unknown)
+  onroad=$(cat "$params/IsOnroad" 2>/dev/null || echo unknown)
+  if [ "$onroad" = "1" ]; then
     echo 'Vehicle is onroad. Park and try again.' >&2
     return 1
+  fi
+  if [ "$offroad" != "1" ] || [ "$onroad" != "0" ]; then
+    if [ "${1:-}" != "--confirm-parked" ]; then
+      echo "Parked state not confirmed (IsOffroad=$offroad, IsOnroad=$onroad); refusing." >&2
+      return 1
+    fi
+    echo "Parked state unknown (IsOffroad=$offroad, IsOnroad=$onroad); continuing on owner confirmation." >&2
   fi
   case "$(git remote get-url origin)" in
     *helico717/openpilot*) ;;

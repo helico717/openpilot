@@ -71,6 +71,7 @@ class SwitchScriptTests(unittest.TestCase):
         self.params = base / 'params'
         self.params.mkdir()
         (self.params / 'IsOnroad').write_text('0')
+        (self.params / 'IsOffroad').write_text('1')
         seed = base / 'seed'
         seed.mkdir()
         git(seed, 'init', '-q', '-b', 'ha-back')
@@ -94,10 +95,10 @@ class SwitchScriptTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def switch(self, expected=None):
+    def switch(self, expected=None, *args):
         env = dict(os.environ, IQ_HA_PARAMS_DIR=str(self.params),
                    IQ_HA_CARROT_RETURN_SHA=expected or self.carrot_sha)
-        return subprocess.run(['bash', str(self.device / 'bootstrap/switch_to_carrot.sh')],
+        return subprocess.run(['bash', str(self.device / 'bootstrap/switch_to_carrot.sh'), *args],
                               env=env, capture_output=True, text=True)
 
     def test_switches_to_pinned_carrot_without_reboot(self):
@@ -120,6 +121,33 @@ class SwitchScriptTests(unittest.TestCase):
         (self.device / 'iq.txt').write_text('iq\n')
         (self.params / 'IsOnroad').write_text('1')
         self.assertNotEqual(self.switch().returncode, 0)
+        self.assertEqual(git(self.device, 'rev-parse', 'HEAD'), before)
+
+    def test_unknown_parked_state_refuses_without_confirmation(self):
+        before = git(self.device, 'rev-parse', 'HEAD')
+        for name in ('IsOnroad', 'IsOffroad'):
+            (self.params / name).unlink()
+            result = self.switch()
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('Parked state not confirmed', result.stderr)
+            self.assertEqual(git(self.device, 'rev-parse', 'HEAD'), before)
+        (self.params / 'IsOffroad').write_text('0')
+        (self.params / 'IsOnroad').write_text('0')
+        self.assertNotEqual(self.switch().returncode, 0)
+        self.assertEqual(git(self.device, 'rev-parse', 'HEAD'), before)
+
+    def test_owner_confirmation_allows_unknown_but_never_onroad(self):
+        (self.params / 'IsOnroad').unlink()
+        (self.params / 'IsOffroad').unlink()
+        result = self.switch(None, '--confirm-parked')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('owner confirmation', result.stderr)
+        self.assertEqual(git(self.device, 'rev-parse', 'HEAD'), self.carrot_sha)
+
+    def test_onroad_refuses_even_with_confirmation(self):
+        before = git(self.device, 'rev-parse', 'HEAD')
+        (self.params / 'IsOnroad').write_text('1')
+        self.assertNotEqual(self.switch(None, '--confirm-parked').returncode, 0)
         self.assertEqual(git(self.device, 'rev-parse', 'HEAD'), before)
 
     def test_untracked_collision_stops_before_checkout(self):

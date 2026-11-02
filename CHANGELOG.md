@@ -29,3 +29,8 @@
 - Diagnostics require FastSleep off: deep standby would stop HA monitoring, terminal and camera while parked.
 - HA pauses the Carrot parameter queue and driving log transfer/screens while this branch runs;
   the device keeps following HA's log transfer policy, so no IQ recordings are uploaded.
+
+## 2026-11-02 — Return requires a confirmed parked state
+
+- switch_to_carrot.sh proceeds only with IsOffroad=1 and IsOnroad=0. Missing or unknown state refuses
+  unless the owner passes --confirm-parked in a guided recovery; an onroad report always refuses.
