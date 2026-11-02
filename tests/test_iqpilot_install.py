@@ -59,6 +59,18 @@ class InstallTests(unittest.TestCase):
         self.assertEqual(git(self.repo,'rev-parse','--abbrev-ref','@{u}'),'origin/iq-ha')
         self.assertFalse((self.repo/'.git/modules/iqpilot-vendor/objects/info/alternates').exists())
 
+    def test_vendor_prepare_accepts_shallow_stock_and_is_independent(self):
+        import shutil
+        shallow=self.base/'shallow'
+        subprocess.run(['git','clone','-q','--no-local','--depth','1',str(self.bare),str(shallow)],check=True)
+        self.assertEqual(git(shallow,'rev-parse','--is-shallow-repository'),'true')
+        shutil.rmtree(self.stage/'vendor/iqpilot')
+        with patch.dict(os.environ,{'GIT_ALLOW_PROTOCOL':'file'}):
+            module.prepare_vendor(self.stage,shallow)
+        self.assertEqual(git(self.stage/'vendor/iqpilot','rev-parse','HEAD'),self.iq_sha)
+        self.assertFalse((self.stage/'.git/modules/iqpilot-vendor/objects/info/alternates').exists())
+        self.assertEqual(git(self.stage/'vendor/iqpilot','remote','get-url','origin'),str(self.bare))
+
     def test_pending_update_missing_parked_or_wrong_os_refuses_before_changes(self):
         before=git(self.repo,'rev-parse','HEAD')
         for key,value in [('UpdaterState','downloading...'),('IsOffroad',''),('IsOnroad','1')]:

@@ -9,6 +9,12 @@ An off-device Carrot settings/database backup is required before switching. Do n
 The initial boot downloads the pinned upstream repository and follows its normal IQ.OS update path.
 HA, Comma installation and reboot must be performed by the owner; do not patch device sources by SSH/SCP.
 
+For a matching clean stock IQ install, clone this branch into a separate staging directory,
+then use `python3 bootstrap/install_from_stock.py --prepare-vendor`. Only after CI and version
+checks, the owner runs the same script without arguments to activate through Git. Shallow
+stock repositories are supported. The script never reboots or restores credentials.
+Full procedure: helico717/carrot-ha docs/IQPILOT_HA_UPDATE_PATH_2026-11-02.md.
+
 After installation, while parked, run:
 
     cd /data/openpilot

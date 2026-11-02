@@ -22,6 +22,28 @@ def parked(params):
         raise ValueError('Explicit offroad state required')
 
 
+def prepare_vendor(stage, repo=Path('/data/openpilot')):
+    """Copy through Git's local upload-pack protocol; shallow sources are valid.
+
+    --reference rejects shallow stock installs. --no-local transfers independent
+    objects without hardlinks/alternates, so later source changes cannot break it.
+    """
+    stage, repo = Path(stage).resolve(), Path(repo).resolve()
+    manifest = json.loads((stage / 'HA_CANDIDATE.json').read_text())
+    vendor = stage / 'vendor/iqpilot'
+    if git(repo, 'rev-parse', 'HEAD') != manifest['iqpilot_sha']:
+        raise ValueError('Stock IQ differs from staged candidate')
+    if not (vendor / '.git').exists():
+        git(stage, 'clone', '--no-local', '--depth', '1', str(repo), str(vendor))
+        git(stage, 'submodule', 'absorbgitdirs', '--', 'vendor/iqpilot')
+        git(stage, 'submodule', 'init', '--', 'vendor/iqpilot')
+        url = git(stage, 'config', '-f', '.gitmodules', '--get', 'submodule.iqpilot-vendor.url')
+        git(vendor, 'remote', 'set-url', 'origin', url)
+    if git(vendor, 'rev-parse', 'HEAD') != manifest['iqpilot_sha']:
+        raise ValueError('Prepared vendor does not match the pinned IQ source')
+    print('IQ_VENDOR_READY', manifest['iqpilot_sha'])
+
+
 def validate(stage, repo, params, version):
     manifest = json.loads((stage / 'HA_CANDIDATE.json').read_text())
     parked(params)
@@ -68,10 +90,12 @@ def activate(stage, repo=Path('/data/openpilot'), params=Path('/data/params/d'),
         if migrated and not cache.exists() and not cache.is_symlink():
             runtime.rename(cache)
         raise
+    git(repo, 'clone', '--no-local', '--depth', '1', str(stage / 'vendor/iqpilot'), str(repo / 'vendor/iqpilot'))
+    git(repo, 'submodule', 'absorbgitdirs', '--', 'vendor/iqpilot')
+    git(repo, 'submodule', 'init', '--', 'vendor/iqpilot')
     git(repo, 'submodule', 'sync', '--recursive')
-    # Dissociate keeps the installed checkout independent of the staging folder.
-    git(repo, 'submodule', 'update', '--init', '--reference', str(stage / 'vendor/iqpilot'),
-        '--dissociate', '--', 'vendor/iqpilot')
+    url = git(stage, 'config', '-f', '.gitmodules', '--get', 'submodule.iqpilot-vendor.url')
+    git(repo / 'vendor/iqpilot', 'remote', 'set-url', 'origin', url)
     git(repo, 'remote', 'set-url', 'origin', ORIGIN)
     git(repo, 'fetch', '--no-tags', 'origin', 'refs/heads/iq-ha:refs/remotes/origin/iq-ha')
     git(repo, 'branch', '--set-upstream-to=origin/iq-ha', 'iq-ha')
@@ -83,7 +107,14 @@ def activate(stage, repo=Path('/data/openpilot'), params=Path('/data/params/d'),
 
 if __name__ == '__main__':
     try:
-        activate(Path(__file__).resolve().parents[1])
+        import sys
+        stage = Path(__file__).resolve().parents[1]
+        if sys.argv[1:] == ['--prepare-vendor']:
+            prepare_vendor(stage)
+        elif not sys.argv[1:]:
+            activate(stage)
+        else:
+            raise ValueError('Use --prepare-vendor, or no arguments to activate')
     except Exception as error:
         print('IQ_HA_NOT_READY: do not reboot; report the failed step before continuing.')
         raise SystemExit(str(error) if isinstance(error, ValueError) else type(error).__name__)
