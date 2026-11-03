@@ -54,7 +54,7 @@ def create_eps_update(packer, bus, eps_stock_values, ea_simulated_torque):
   return packer.make_can_msg("LH_EPS_03", bus, values)
 
 
-def create_lka_hud_control(packer, bus, ldw_stock_values, lat_active, steering_pressed, hud_alert, hud_control, sound_alert):
+def create_lka_hud_control(packer, bus, ldw_stock_values, lat_active, steering_pressed, hud_alert, hud_control, sound_alert, display_probe=None):
   display_mode = 1 if lat_active else 0
 
   values = {}
@@ -75,7 +75,12 @@ def create_lka_hud_control(packer, bus, ldw_stock_values, lat_active, steering_p
     "LDW_Lernmodus_rechts": 3 + display_mode if hud_control.rightLaneDepart else 1 + hud_control.rightLaneVisible + display_mode,
     "LDW_Texte": hud_alert,
   })
-  return packer.make_can_msg("LDW_02", bus, values)
+  if display_probe is not None:
+    values = display_probe.apply(values)
+  message = packer.make_can_msg("LDW_02", bus, values)
+  if display_probe is not None:
+    display_probe.packed(message)
+  return message
 
 
 def create_blinker_control(packer, bus, ea_hud_stock_values, ea_control_stock_values, left_blinker, right_blinker, hide_error):

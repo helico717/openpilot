@@ -5,7 +5,7 @@ from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.interfaces import CarControllerBase
 from opendbc.car.lateral import apply_std_curvature_limits
 from opendbc.car.volkswagen import mqbcan, pqcan, mebcan
-from opendbc.car.volkswagen.values import CANBUS, CarControllerParams, VolkswagenFlags
+from opendbc.car.volkswagen.values import CANBUS, CAR, CarControllerParams, VolkswagenFlags
 
 VisualAlert = structs.CarControl.HUDControl.VisualAlert
 LongCtrlState = structs.CarControl.Actuators.LongControlState
@@ -15,6 +15,10 @@ class CarController(CarControllerBase):
   def __init__(self, dbc_names, CP):
     super().__init__(dbc_names, CP)
     self.CCP = CarControllerParams(CP)
+    self.idlight_probe = None
+    if CP.carFingerprint == CAR.VOLKSWAGEN_ID4_MK1:
+      from opendbc.car.volkswagen.idlight_probe import DisplayProbe
+      self.idlight_probe = DisplayProbe()
     if CP.flags & VolkswagenFlags.PQ:
       self.CCS = pqcan
     elif CP.flags & VolkswagenFlags.MEB:
@@ -247,7 +251,7 @@ class CarController(CarControllerBase):
       if self.CP.flags & VolkswagenFlags.MEB:
         # MEB: create_lka_hud_control은 sound_alert 인자 추가 필요
         can_sends.append(self.CCS.create_lka_hud_control(self.packer_pt, CANBUS.pt, CS.ldw_stock_values, CC.latActive,
-                                                         CS.out.steeringPressed, hud_alert, hud_control, 0))
+                                                         CS.out.steeringPressed, hud_alert, hud_control, 0, self.idlight_probe))
       else:
         can_sends.append(self.CCS.create_lka_hud_control(self.packer_pt, CANBUS.pt, CS.ldw_stock_values, CC.latActive,
                                                          CS.out.steeringPressed, hud_alert, hud_control))

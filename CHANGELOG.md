@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-03 — ID.4 LDW display-field isolation probe
+
+- User requested preparing one-field remote experiments from the working hands-on warning path, with actual transmission only after an explicit send instruction. Added an optional ID4 MK1-only existing LDW_02 packer hook and a Git-managed request/check/status/cancel CLI.
+- Profiles cover defined takeover text8/text4 and separate left/right lane/warning fields. Default1s expiry restores normal generator values; no startup request, independent sender, control CAN, Panda safety or forwarding changes. Runtime state outside Git. No speed/brake gate added.
+- Nine real-DBC/packer desktop tests pass, including bit-mask preservation, expiry, passive check, malformed/replay rejection and existing-warning preservation. Windows Params import shim only. Physical device installation, request handling and visible ID.Light responses remain unverified. No vehicle CAN/UDS test sent. This is cause-isolation preparation, not discovery of navigation animation IDs.
+- Details: docs/idlight_warning_probe_20261103.md. Docs-Not-Needed: internal experiment without user settings/catalog changes.
+
 ## 2026-11-03 — Temporary onroad HA terminal opt-in
 
 - User explicitly requested temporary onroad remote terminal access without speed or brake conditions for ID.Light testing.
