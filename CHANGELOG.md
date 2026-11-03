@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-11-03 — ID.4 cluster display catalog
+
+- User requested a complete explanation of the factory-cluster messages, icons,
+  numeric fields, unused mappings and stock-relayed warnings, plus HA terminal update guidance.
+- Added `docs/id4_cluster_display_catalog_20261103.md`, audited against runtime
+  `cd5bfae1a`, MEB controller/packer/controls, values, speed table and MK1 DBC.
+- Includes all primary/secondary ACC text enums as explicitly dormant protocol choices;
+  separates automatic OP events from stock EA relay and unknown/unverified rendering.
+- Validation: source/DBC cross-check; appendix entry counts checked programmatically;
+  Markdown links and Git whitespace checked. Documentation only; no new runtime test,
+  version bump, vehicle installation, restart or physical CAN transmission.
+- Delivery: documentation commit on `carrot-wip-model_selector-ha`; no separate
+  vehicle update required for the catalog. Remote publication verified in task report.
+
 ## 2026-11-03 — ID.4 navigation camera notice while ACC is inactive
 
 - Request/reason: show the cluster's speed-camera/section-control "ahead" notice
