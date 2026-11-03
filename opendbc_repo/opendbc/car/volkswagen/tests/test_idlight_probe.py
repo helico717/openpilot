@@ -53,7 +53,7 @@ class DisplayProbeTest(unittest.TestCase):
 
   def test_text_profile_values_match_explicit_trial_scope(self):
     self.assertEqual({change["LDW_Texte"] for change in PROFILES.values() if "LDW_Texte" in change},
-                     {1, 2, 3, 4, 5, 6, 7, 8, 9})
+                     set(range(16)))
 
   def test_default_no_request_matches_original_and_writes_nothing(self):
     self.assertEqual(self.frame(), self.frame(False))

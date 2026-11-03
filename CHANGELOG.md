@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-03 — Full 4-bit LDW_Texte experiment range
+
+- User clarified that1..9 was illustrative and explicitly requested all raw values0..15. Added text0..text15 as individual profiles;0 is neutral,4/8 defined warnings, other meanings unverified.
+- Same1s default expiry, restoration and existing-warning preservation. No automatic sweep, CAN ID/control/Panda changes, or startup request.
+- Validation:10 focused real-DBC tests now cover all22 profiles and exact text range0..15; CLI list and diff checks pass. No additional vehicle trial performed. Docs-Not-Needed: internal operator experiment without settings changes.
+
 ## 2026-11-03 — Explore user-selected LDW_Texte values
 
 - User explicitly authorized adding raw values1,2,3,5,6,7,9 to the existing one-field display experiment after warning8/4 worked and three left-field trials showed no visible response. Meanings remain unknown on MEB; do not label these as navigation presets.

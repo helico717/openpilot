@@ -8,7 +8,7 @@ The ID.4 MK1 controller already generates LDW_02, CAN0, ID0x397,8B, at the exist
 
 ## Evidence and candidate order
 
-Current carcontroller maps visualAlert steerRequired/ldw to LDW_Texte8. The DBC defines0 none,8 laneAssistTakeOver,4 laneAssistTakeOverUrgent. The user's observed ID.Light warning response has not yet been causally assigned to one field. `text8` is the initial sufficiency test; `text4` compares the second defined warning level. Subsequently the user explicitly authorized testing1,2,3,5,6,7,9 in this same field. These are exploratory values without confirmed MEB meanings, not known animation numbers. Values10..15 remain outside the allowlist.
+Current carcontroller maps visualAlert steerRequired/ldw to LDW_Texte8. The DBC defines0 none,8 laneAssistTakeOver,4 laneAssistTakeOverUrgent. The user's observed ID.Light warning response has not yet been causally assigned to one field. `text8` is the initial sufficiency test; `text4` compares the second defined warning level. Subsequently the user explicitly authorized testing1,2,3,5,6,7,9 in this same field. These are exploratory values without confirmed MEB meanings, not known animation numbers. The latest user instruction expands the allowlist to the entire4-bit range0..15; see the full-range section below.
 
 | Profile | Only changed field | Value | Meaning/uncertainty |
 |---|---|---|---|
@@ -70,3 +70,10 @@ After text8/text4 produced user-observed cluster + ID.Light reactions and left3/
 The first next trial is text1; subsequent values are tested individually after observations. The names text1..text9 identify raw field values, not documented meanings. Displaying different cluster warnings, sound, no effect, or ID.Light effects are all possible outcomes; do not infer semantics before observation.
 
 Validation:10 focused tests using real vw_meb packer cover all15 profiles, exact field masks and restoration, plus explicit text allowlist1..9. The seven new values have not been sent to the vehicle. User Git update/reboot is required before remote execution; no device source editing.
+
+
+## Latest scope: full LDW_Texte 0..15
+
+The user clarified that1..9 was an example and explicitly requested including all values0..15. The CLI now offers text0 through text15. These are raw field values, not animation identifiers. Defined semantics remain0 none,4 urgent takeover,8 takeover; all other MEB meanings remain unknown. text0 is a neutral comparison and does not override a separately occurring real warning because the existing warning-abort rule remains.
+
+All16 values remain individual explicit requests, default1s, with normal-value restoration. No automatic sweep or request-on-install. No numeric values outside the4-bit range. Tests validate all22 profiles (16 text plus6 left/right) against the real DBC packer and retain the exact field mask. Further values have not been vehicle-tested.
