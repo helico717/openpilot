@@ -8,7 +8,7 @@ The ID.4 MK1 controller already generates LDW_02, CAN0, ID0x397,8B, at the exist
 
 ## Evidence and candidate order
 
-Current carcontroller maps visualAlert steerRequired/ldw to LDW_Texte8. The DBC defines0 none,8 laneAssistTakeOver,4 laneAssistTakeOverUrgent. The user's observed ID.Light warning response has not yet been causally assigned to one field. `text8` is the initial sufficiency test; `text4` compares the second defined warning level. Other values1..3/5..7/9..15 are NOT included as undocumented animation numbers.
+Current carcontroller maps visualAlert steerRequired/ldw to LDW_Texte8. The DBC defines0 none,8 laneAssistTakeOver,4 laneAssistTakeOverUrgent. The user's observed ID.Light warning response has not yet been causally assigned to one field. `text8` is the initial sufficiency test; `text4` compares the second defined warning level. Subsequently the user explicitly authorized testing1,2,3,5,6,7,9 in this same field. These are exploratory values without confirmed MEB meanings, not known animation numbers. Values10..15 remain outside the allowlist.
 
 | Profile | Only changed field | Value | Meaning/uncertainty |
 |---|---|---|---|
@@ -61,3 +61,12 @@ Final OEM navigation goal remains unresolved even if warnings work. This experim
 ## Validation and remaining checks
 
 Nine desktop tests using actual vw_meb CANPacker and real create_lka_hud_control cover all8 profiles' exact field masks, original-frame equivalence, expiry restoration, no replay, cancel, passive check, real-warning preservation, malformed/stale/future/other-boot requests and status-I/O failure. Windows-only unused Params import shim; Python UTF8 and isolated pycapnp dependency required. No mocked DBC/packer. No physical CAN transmission or ID.Light acceptance result yet.
+
+
+## User-authorized undefined text-value exploration
+
+After text8/text4 produced user-observed cluster + ID.Light reactions and left3/sw-left/warn-left produced no visible change, the user explicitly asked about Texte1,2,3,5,6,7,9 and said “한번 해보자”. Added exactly those seven text profiles. Each changes only bits16..19 and uses the same default1s expiry/normal restoration. No arbitrary numeric CLI, automatic sweep, other CAN IDs or safety changes.
+
+The first next trial is text1; subsequent values are tested individually after observations. The names text1..text9 identify raw field values, not documented meanings. Displaying different cluster warnings, sound, no effect, or ID.Light effects are all possible outcomes; do not infer semantics before observation.
+
+Validation:10 focused tests using real vw_meb packer cover all15 profiles, exact field masks and restoration, plus explicit text allowlist1..9. The seven new values have not been sent to the vehicle. User Git update/reboot is required before remote execution; no device source editing.

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-03 — Explore user-selected LDW_Texte values
+
+- User explicitly authorized adding raw values1,2,3,5,6,7,9 to the existing one-field display experiment after warning8/4 worked and three left-field trials showed no visible response. Meanings remain unknown on MEB; do not label these as navigation presets.
+- Added exactly seven allowlisted profiles; same1s default expiry and normal restoration. No generic numeric send, automatic sweep, new CAN IDs, Panda or control changes.
+- Validation:10 real-DBC packer tests cover all15 profiles and explicit text allowlist1..9; CLI help and syntax checked. Seven new values not yet vehicle-tested; user Git update/reboot required.
+- Docs-Not-Needed: internal operator experiment; no settings/catalog changes. See docs/idlight_warning_probe_20261103.md.
+
 ## 2026-11-03 — ID.4 LDW display-field isolation probe
 
 - User requested preparing one-field remote experiments from the working hands-on warning path, with actual transmission only after an explicit send instruction. Added an optional ID4 MK1-only existing LDW_02 packer hook and a Git-managed request/check/status/cancel CLI.

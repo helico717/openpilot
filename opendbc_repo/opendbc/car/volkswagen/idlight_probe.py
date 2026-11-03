@@ -13,6 +13,8 @@ import uuid
 ROOT = Path("/data/carrot_ha/idlight-probe")
 BOOT = Path("/proc/sys/kernel/random/boot_id")
 PROFILES = {
+  # User-authorized exploration: these text values have no confirmed MEB meaning.
+  **{f"text{value}": {"LDW_Texte": value} for value in (1, 2, 3, 5, 6, 7, 9)},
   "text8": {"LDW_Texte": 8},
   "text4": {"LDW_Texte": 4},
   "left3": {"LDW_Lernmodus_links": 3},
