@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-03 — Temporary onroad HA terminal opt-in
+
+- User explicitly requested temporary onroad remote terminal access without speed or brake conditions for ID.Light testing.
+- Added boot-scoped enable/disable/status CLI under selfdrive/carrot/ha/terminal_onroad.py; runtime state stays outside Git. Default off; reboot or disable restores offroad-only access.
+- Agent reports actual offroad separately from the explicit override. Existing authentication, single-controller lease and input limits remain enforced by HA.
+- Validation: 9 terminal/override tests pass on desktop. Companion HA real-WebSocket tests 5 pass. No CAN/UDS transmission, physical onroad test or device installation performed. User clean pull/reboot required; enable only after reboot.
+
 ## 2026-11-03 — ID.4 cluster display catalog
 
 - User requested a complete explanation of the factory-cluster messages, icons,

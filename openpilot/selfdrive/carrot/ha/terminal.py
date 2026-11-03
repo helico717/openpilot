@@ -59,8 +59,11 @@ def is_offroad() -> bool:
 
 
 class TerminalAgent:
-  def __init__(self, status=is_offroad):
-    self.status = status
+  def __init__(self, status=None):
+    from openpilot.selfdrive.carrot.ha.terminal_onroad import enabled
+    self.offroad_status = is_offroad if status is None else status
+    self.onroad_override = enabled if status is None else lambda: False
+    self.status = lambda: self.offroad_status() or self.onroad_override()
     self.local_ws = None
     self.local_client = None
     self.local_task = None
@@ -197,9 +200,11 @@ class TerminalAgent:
 
   async def status_loop(self, remote) -> None:
     while True:
-      offroad = self.status()
-      ready = offroad and await self.local_ready()
-      if not offroad and self.session_id is not None:
+      offroad = self.offroad_status()
+      onroad_override = self.onroad_override()
+      allowed = offroad or onroad_override
+      ready = allowed and await self.local_ready()
+      if not allowed and self.session_id is not None:
         old_session = self.session_id
         await self.stop_local()
         await self.send(remote, {"type": "ended", "session_id": old_session, "reason": "device_not_offroad"})
@@ -207,6 +212,7 @@ class TerminalAgent:
         "type": "status",
         "protocol": PROTOCOL,
         "offroad": offroad,
+        "onroad_override": onroad_override,
         "local_ready": ready,
       })
       await asyncio.sleep(3)
