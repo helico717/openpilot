@@ -30,7 +30,15 @@ The registration selects BLE instead of the Jetson PEAK sender. The separate
 native CAN-FD SPAS setting must be off to use the BLE actuator.
 
 Comma uses the existing remote, lane-change and turn policy. The board owns
-classic CAN encoding, one-shot transmission, counter reservation and timing.
+classic CAN encoding, one-shot transmission, counter reservation and timing. A single shot lost to arbitration can retry the
+identical first frame up to 16 times within 40 ms. After its first successful
+retry the board times the rest of the tap from that transmission. Later frames
+may retry up to eight times within 18 ms and at least 5 ms before the next slot. Other
+CAN errors stop the sequence. If a confirmed press already reached the bus,
+a fresh, matching lamp-on within the 350 ms observation window may acknowledge
+the original request after arbitration exhaustion. The board records
+lamp_confirmed_partial and the actual confirmed-frame count separately. It never
+starts the whole tap again to manufacture a completion.
 A matching car name is not required for B1. Two fresh standard 8-byte streams,
 valid 0x3C1 CRC/counter, and neutral lever/idle 0x413 lamp feedback are required
 to begin a tap. Address collisions alone cannot establish vehicle compatibility.
@@ -75,3 +83,22 @@ transfer, or confirms offroad. The board accepts this separately authenticated
 manifest only outside an active CAN transmission and ignores control commands
 until the update finishes or aborts. Add --quiet-bus when upgrading an earlier
 board that does not yet support the parked manifest.
+## Automatic updates after Git Pull
+
+The comma checkout includes CarrotB1.bin. After the usual Git Pull and reboot,
+Carrot Web checks the authenticated, registered board even while the car is
+moving. Automatic updates wait for the indicator to be idle for four seconds,
+with no queued request or hold, then recheck the board state and lamps before
+starting. During transfer the S3 automatic indicator is unavailable and the
+C3/C4 badge shows an update in progress. Only the S3 reboots after verification.
+The manual command above retains its Park guard.
+A new release installs over BLE and the running ELF build ID is read after
+reconnection. The current build is skipped, newer board releases are preserved
+and conflicting builds with the same release number are reported. Failed
+transfers back off. A legacy board without the diagnostic characteristic
+requires a quiet CAN bus for its first update.
+
+For a release, increment RELEASE_TAG in the sketch, build the application with
+the board settings above, and commit its CarrotB1.ino.bin as tools/carrot_b1/CarrotB1.bin
+in the same change. The release number and ELF identity are extracted from the
+bundled app image. Never package a device flash dump or its enrollment data.
