@@ -270,11 +270,13 @@ class CarController(CarControllerBase):
         acc_event = self.CCS.acc_hud_event(acc_hud_status, CS.esp_hold_confirmation, False, 0, 0)  # 3(정차대기) 또는 0
         speed_limit = 0.
         event_speed_kph = 0
-        if acc_hud_status in (3, 4):  # ACTIVE / OVERRIDE 에서만 계기판 이벤트 표시
-          if hud_control.naviSpeedLimit > 0:  # 단속카메라/구간단속 제한속도
-            speed_limit = hud_control.naviSpeedLimit * CV.KPH_TO_MS
-            acc_event = 4  # 표지판 + "전방" (앞에 있는 카메라에 대한 예고 - 아이콘 없이 유지)
-          elif hud_control.naviEventType == 1 and hud_control.naviEventSpeed != 0:  # 커브 (부호=방향)
+        # 단속 예고는 정보 표시이므로 ACC 활성화 여부와 분리한다.
+        # ACC 상태/제어 요청은 그대로 유지하고 전방 이벤트와 제한값만 보낸다.
+        if hud_control.naviSpeedLimit > 0:
+          speed_limit = hud_control.naviSpeedLimit * CV.KPH_TO_MS
+          acc_event = 4  # 표지판 + "전방"
+        elif acc_hud_status in (3, 4):  # 나머지 제어 이벤트는 ACTIVE / OVERRIDE 에서만 표시
+          if hud_control.naviEventType == 1 and hud_control.naviEventSpeed != 0:  # 커브 (부호=방향)
             # 실차 확인: 7=우커브, 8=좌커브. vTurnSpeed 양수=우, 음수=좌 (실주행 검증으로 확정).
             acc_event = 7 if hud_control.naviEventSpeed > 0 else 8
             event_speed_kph = abs(hud_control.naviEventSpeed)

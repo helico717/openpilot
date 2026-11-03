@@ -291,7 +291,7 @@ def get_desired_gap(distance_bars, desired_gap, current_gap_signal):
 def create_acc_hud_control(packer, bus, acc_control, set_speed, lead_visible, distance_bars, show_distance_bars, esp_hold, distance, desired_gap, fcw_alert, acc_event, speed_limit, event_speed_kph=0, status_icon=0):
   values = {
     "ACC_Status_ACC":                acc_control,
-    "ACC_Tempolimit":                map_speed_to_acc_tempolimit(speed_limit) if acc_control in (ACC_HUD_ACTIVE, ACC_HUD_OVERRIDE) else 0,
+    "ACC_Tempolimit":                map_speed_to_acc_tempolimit(speed_limit) if acc_event == 4 or acc_control in (ACC_HUD_ACTIVE, ACC_HUD_OVERRIDE) else 0,
     "ACC_Wunschgeschw_02":           set_speed if set_speed < 250 else 327.36,
     "ACC_Gesetzte_Zeitluecke":       distance_bars,
     "ACC_Display_Prio":              0 if fcw_alert and acc_control in (ACC_HUD_ACTIVE, ACC_HUD_OVERRIDE) else 1,

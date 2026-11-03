@@ -321,7 +321,9 @@ class Controls:
       carrot_man = self.sm['carrotMan']
       # 단속카메라/구간단속 (방지턱 22는 계기판 미표시 - 제한속도 표지로 오인됨)
       navi_speed_limit = 0
-      if carrot_man.xSpdType >= 0 and carrot_man.xSpdType != 22 and carrot_man.xSpdLimit > 0:
+      # 연결이 끊긴 carrotMan의 마지막 단속 정보로 비활성 ACC 배너를 유지하지 않는다.
+      if (self.sm.alive['carrotMan'] and self.sm.valid['carrotMan'] and carrot_man.activeCarrot >= 2
+          and carrot_man.xSpdType >= 0 and carrot_man.xSpdType != 22 and carrot_man.xSpdLimit > 0):
         navi_speed_limit = int(carrot_man.xSpdLimit)
       hudControl.naviSpeedLimit = navi_speed_limit
       # 커브 / 교차로 / 분기·출구 / 로터리 / 병목 / 정체 (실차 스캔으로 확정된 이벤트 지도 기반)

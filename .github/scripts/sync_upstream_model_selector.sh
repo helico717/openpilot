@@ -26,6 +26,13 @@ if ! git rev-parse -q --verify MERGE_HEAD >/dev/null; then
   echo "Merge did not start (status $merge_status)."
   exit 1
 fi
+# A clean textual merge can still change the fork's inactive-ACC navigation HUD.
+# Refuse publication if production HUD logic no longer satisfies the contract.
+if ! python3 tools/test_id4_navigation_hud.py; then
+  echo "ID.4 navigation HUD regression; refusing to publish the upstream merge."
+  git merge --abort
+  exit 1
+fi
 git commit -m "chore: auto-sync upstream happymaj11r/carrot-wip-model_selector"
 if [ "${SYNC_WORKFLOWS:-false}" != "true" ]; then
   git diff --exit-code "$base_commit" HEAD -- .github/workflows/
