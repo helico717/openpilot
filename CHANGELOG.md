@@ -1,3 +1,8 @@
+## 2026-11-04 — Charging record quality CI passed
+
+- Published code27e02e26baa3c905f6de484fa501912ab2404639 on carrot-wip-model_selector-ha. Dedicated Linux charging-record CI41765211369 completed success: https://github.com/helico717/openpilot/actions/runs/41765211369 . Remote SHA matched before recording this result.
+- Existing unrelated camera2/sync1 desktop failures remain documented separately. Companion report/HA reason preservation published as carrot-ha06cbfc5; home VPN unavailable, so HA direct application and owner vehicle Git Pull/reboot remain pending. No IQ publication, vehicle source SSH/SCP edits, reboot or release.
+
 ## 2026-11-04 — Charge completeness: normal departure and missing measurements
 
 - User request: preserve a normal charge-to-drive boundary as complete; use partial only for missing/invalid collection evidence and explain its cause. Legacy energy-led collector could mark a normal departure partial before closing a session; current CAN-led recorder already avoids that condition.
