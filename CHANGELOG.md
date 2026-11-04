@@ -1,3 +1,9 @@
+## 2026-11-04 — Charge completeness: normal departure and missing measurements
+
+- User request: preserve a normal charge-to-drive boundary as complete; use partial only for missing/invalid collection evidence and explain its cause. Legacy energy-led collector could mark a normal departure partial before closing a session; current CAN-led recorder already avoids that condition.
+- Add deduplicated partial_reasons and detect measurement gaps across collector downtime/restarts even without update(None). Same-mode reconstructed gaps remain unknown time and partial, not confirmed collection. Track missing battery energy separately from stable quantized energy. Preserve driving boundaries and never credit a driving energy sample.
+- Files: openpilot/selfdrive/carrot/ha/charge_recorder.py and tests/test_charge_quality.py. Companion carrot-ha preserves reason metadata and provides a historical replay report/tool. User confirmed carrot-wip-model_selector-ha (not IQpilot). Charge tests20 + existing CAN recorder9 + polling4 pass. Full121 tests:118 pass; camera2/sync1 failures also reproduce on the unchanged HEAD baseline. Actual archive replay26 sessions preserves energy; five old partial flags reproduce the normal-departure pattern; archive-only gaps remain inconclusive. No vehicle edits/install/reboot. Git-only publication pending.
+
 # Changelog
 
 ## 2026-11-03 — Full 4-bit LDW_Texte experiment range

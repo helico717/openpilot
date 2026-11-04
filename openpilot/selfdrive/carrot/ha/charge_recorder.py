@@ -4,6 +4,8 @@ import uuid
 from datetime import datetime, timezone, timedelta
 
 MAX_GAP = 1800
+# Match the collector CAN evidence lease; a restart must not hide lost samples.
+MEASUREMENT_GAP_S = 90
 INVALID_WH = {102250, 102300, 102350, 102375}
 
 def stamp(t):
@@ -12,10 +14,21 @@ def stamp(t):
 def valid_energy(wh):
     return type(wh) in (int,float) and math.isfinite(wh) and 0<wh<=102325 and wh not in INVALID_WH
 
-def finish(state, partial=False):
+def mark_partial(charge, reason):
+    charge['partial'] = True
+    reasons = charge.setdefault('partial_reasons', [])
+    if reason not in reasons:
+        reasons.append(reason)
+
+
+def finish(state, partial=False, reason=None):
     charge=state.pop('charge',None)
     if charge:
-        charge['partial']=bool(charge.get('partial') or partial)
+        if partial:
+            mark_partial(charge, reason or 'unresolved_signal_gap')
+        if charge.get('partial') and not charge.get('partial_reasons'):
+            charge['partial_reasons'] = ['legacy_reason_unavailable']
+        charge['partial']=bool(charge.get('partial'))
         state['charge_sessions'].append(charge)
         state['charge_sessions']=state['charge_sessions'][-50:]
     state.pop('can_charge_gap',None)
@@ -29,7 +42,7 @@ def add_energy(state, charge, wh, at, corrected=False):
     if added<50:return  # Accumulate quantized steps, never count a rebound twice.
     dt=at-charge.get('last_energy_at',at)
     if dt<=0 or added*3600/dt>250000:
-        charge['partial']=True;return
+        mark_partial(charge, 'implausible_energy_increase');return
     kwh=added/1000
     charge['peak_wh']=wh;charge['last_energy_at']=at;charge['energy_kwh']+=kwh
     if corrected:charge['corrected_energy_kwh']+=kwh
@@ -43,29 +56,34 @@ def update(state, now, signal, wh=None):
     valid=valid_energy(wh)
     charge=state.get('charge');active=signal['charging']
     if charge and charge.get('source') not in ('can_request', 'can_actual'):
-        finish(state,True);charge=None
+        finish(state,True,'legacy_session_unverified');charge=None
     if active is None:
         if charge:
             state.setdefault('can_charge_gap',charge.get('last_mode_at',now))
-            if now-state['can_charge_gap']>MAX_GAP:finish(state,True)
+            if now-state['can_charge_gap']>MAX_GAP:finish(state,True,'charging_signal_timeout')
         return
     mode_at=datetime.fromisoformat(signal['measured_at']).timestamp() if signal.get('measured_at') else now
+    if charge and mode_at-charge['last_mode_at'] > MEASUREMENT_GAP_S:
+        # No update(None) can run while the collector is stopped. Recognize
+        # that missing interval when the first new CAN measurement arrives.
+        state.setdefault('can_charge_gap', charge['last_mode_at'])
     if active is False:
         # Capture the final nearby stationary energy sample, not a new charge.
         if charge and 'can_charge_gap' not in state and not signal.get('driving') and 0<=mode_at-charge['last_mode_at']<=45:
             add_energy(state,charge,wh,mode_at)
-        finish(state,partial='can_charge_gap' in state)
+        finish(state,partial='can_charge_gap' in state,reason='charging_signal_gap_before_stop')
         if valid:state['can_energy_anchor']={'wh':wh,'at':now}
         return
     code=signal['code'];gap=state.get('can_charge_gap')
     if charge and charge['can_mode']!=code:
-        finish(state,True);charge=None;gap=None
+        finish(state,True,'charging_mode_changed_without_stop');charge=None;gap=None
     if charge and gap is not None:
         elapsed=mode_at-charge['last_mode_at']
         delta=wh-charge.get('peak_wh',wh) if valid and charge.get('peak_wh') is not None else None
         if elapsed>MAX_GAP or elapsed<=0 or delta is None or delta<0 or delta*3600/elapsed>250000:
-            finish(state,True);charge=None;gap=None
+            finish(state,True,'unrecoverable_signal_gap');charge=None;gap=None
         else:
+            mark_partial(charge, 'charging_signal_gap')
             charge.setdefault('signal_gaps', []).append({'started_at':stamp(charge['last_mode_at']), 'ended_at':stamp(mode_at)})
             charge['unknown_duration_s']+=elapsed
             charge['gap_corrected']=True;charge['gap_count']+=1
@@ -78,8 +96,14 @@ def update(state, now, signal, wh=None):
         charge=state['charge']={'id':str(uuid.uuid4()),'source':'can_actual' if signal.get('source_kind') == 'actual' else 'can_request','can_mode':code,
             'started_at':stamp(mode_at),'ended_at':stamp(mode_at),'energy_kwh':0,'duration_s':0,
             'confirmed_duration_s':0,'unknown_duration_s':0,'gap_corrected':False,'gap_count':0,
-            'corrected_energy_kwh':0,'signal_gaps':[],'partial':baseline is None,'fast':code==6,'peak_wh':baseline,
-            'month_energy':{},'last_mode_at':mode_at,'last_energy_at':energy_at}
+            'corrected_energy_kwh':0,'signal_gaps':[],'partial':baseline is None,
+            'partial_reasons':['missing_start_energy'] if baseline is None else [],'fast':code==6,'peak_wh':baseline,
+            'month_energy':{},'last_mode_at':mode_at,'last_energy_at':energy_at,'last_energy_observed_at':energy_at}
+    energy_observed = charge.get('last_energy_observed_at', charge.get('last_energy_at', mode_at))
+    if mode_at-energy_observed > MEASUREMENT_GAP_S:
+        mark_partial(charge, 'battery_energy_measurement_gap')
+    if valid:
+        charge['last_energy_observed_at'] = max(mode_at, energy_observed)
     previous=charge['last_mode_at']
     if gap is None and mode_at>previous:charge['confirmed_duration_s']+=mode_at-previous
     charge['duration_s']=charge['confirmed_duration_s']

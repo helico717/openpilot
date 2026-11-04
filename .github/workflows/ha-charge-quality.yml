@@ -1,0 +1,24 @@
+name: HA charging record quality
+on:
+  push:
+    branches: [carrot-wip-model_selector-ha]
+    paths:
+      - 'openpilot/selfdrive/carrot/ha/charge_recorder.py'
+      - 'openpilot/selfdrive/carrot/ha/tests/test_charge*.py'
+      - 'openpilot/selfdrive/carrot/ha/tests/test_can_charge_recorder.py'
+      - '.github/workflows/ha-charge-quality.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  charging-records:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Charging boundaries, missing measurements and reason preservation
+        run: |
+          python -m unittest discover -s openpilot/selfdrive/carrot/ha/tests -p 'test_charge*.py'
+          python -m unittest discover -s openpilot/selfdrive/carrot/ha/tests -p test_can_charge_recorder.py
