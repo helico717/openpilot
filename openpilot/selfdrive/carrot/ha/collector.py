@@ -205,7 +205,7 @@ def main():
     except Exception as err:
         print('Param sync start error:', err, flush=True)
 
-    sm = messaging.SubMaster(['carState', 'gpsLocationExternal', 'gpsLocation', 'peripheralState', 'selfdriveState', 'deviceState'])
+    sm = messaging.SubMaster(['carState', 'carControl', 'gpsLocationExternal', 'gpsLocation', 'peripheralState', 'selfdriveState', 'deviceState'])
     params = Params()
     consumed = -1
     last_health = 0
@@ -251,6 +251,15 @@ def main():
         if sm.valid.get('selfdriveState') and mono - sm.recv_time['selfdriveState'] < 10:
             enabled = bool(sm['selfdriveState'].enabled)
 
+        # Assist statistics use a stricter 2s freshness (both services are
+        # 100Hz). The 10s telemetry `enabled` display above is unchanged.
+        control = {'lat': None, 'long': None, 'enabled': None}
+        if sm.valid.get('carControl') and sm.seen.get('carControl') and mono - sm.recv_time['carControl'] < 2:
+            cc = sm['carControl']
+            control['lat'], control['long'] = bool(cc.latActive), bool(cc.longActive)
+        if sm.valid.get('selfdriveState') and sm.seen.get('selfdriveState') and mono - sm.recv_time['selfdriveState'] < 2:
+            control['enabled'] = bool(sm['selfdriveState'].enabled)
+
         motion = None
         if sm.valid.get('carState') and sm.seen.get('carState') and mono - sm.recv_time['carState'] < 2:
             car = sm['carState']
@@ -265,7 +274,7 @@ def main():
                 diagnostics = None
             last_health = mono
 
-        events = engine.tick(now, params.get_bool('IsOnroad'), gps, sampled, enabled, motion=motion, diagnostics=diagnostics, monotonic_now=mono)
+        events = engine.tick(now, params.get_bool('IsOnroad'), gps, sampled, enabled, motion=motion, diagnostics=diagnostics, monotonic_now=mono, control=control)
         if any(path == '/api/telemetry' for path, _ in events):
             first_snapshot.set()
 

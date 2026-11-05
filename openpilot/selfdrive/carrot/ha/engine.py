@@ -14,6 +14,124 @@ def distance(a,b):
     h=math.sin((p2-p1)/2)**2+math.cos(p1)*math.cos(p2)*math.sin(math.radians(b['longitude']-a['longitude'])/2)**2
     return 6371000*2*math.asin(min(1,math.sqrt(h)))
 
+
+# --- openpilot assist statistics (carrot-ha docs/OPENPILOT_ASSIST_STATS_PLAN_2026-11-05.md) ---
+# Each 1s CAN-speed distance increment is attributed to the control class of
+# the previous fresh sample. Unknown signals are never guessed; gaps end
+# streaks; engagement counts are 1s-sample based and ignore re-observation.
+ASSIST_VERSION = 1
+ASSIST_CLASSES = ('manual', 'latOnly', 'longOnly', 'both')
+ASSIST_ACTIVE = ('latOnly', 'longOnly', 'both')
+ASSIST_BUCKET_S = 900
+ASSIST_STREAK_MIN_M = 100
+ASSIST_STREAK_KEEP = 50
+
+def assist_class(control):
+    if not control:
+        return None
+    lat, lon = control.get('lat'), control.get('long')
+    if type(lat) is not bool or type(lon) is not bool:
+        return None
+    return ('both' if lon else 'latOnly') if lat else ('longOnly' if lon else 'manual')
+
+def assist_enabled(control):
+    value = (control or {}).get('enabled')
+    return value if type(value) is bool else None
+
+def assist_new():
+    return {'m': {k: 0.0 for k in ASSIST_CLASSES + ('unknown',)},
+            'enabled': {'on': 0.0, 'off': 0.0, 'unknown': 0.0},
+            'known_s': 0.0, 'assist_s': 0.0, 'engagements': 0, 'disengagements': 0,
+            'buckets': {}, 'streaks': [], 'streak_count': 0,
+            'longest_m': 0.0, 'longest_s': 0.0, 'cur': None}
+
+def assist_close(a, end, broken):
+    cur = a.get('cur')
+    a['cur'] = None
+    if not cur or cur['m'] <= 0:
+        return
+    if cur['m'] > a['longest_m']:
+        a['longest_m'], a['longest_s'] = cur['m'], cur['s']
+    if cur['m'] >= ASSIST_STREAK_MIN_M:
+        a['streak_count'] += 1
+        a['streaks'].append({'startAt': stamp(cur['start']), 'endAt': stamp(end),
+                             'distanceM': round(cur['m'], 1), 'brokenByGap': bool(broken)})
+        a['streaks'].sort(key=lambda x: -x['distanceM'])
+        del a['streaks'][ASSIST_STREAK_KEEP:]
+
+def assist_gap(trip, now):
+    """Distance or signal continuity was lost: end any streak without bridging."""
+    a = trip.get('assist')
+    if a:
+        assist_close(a, trip.get('assist_last_at', now), True)
+    trip.pop('assist_prev', None)
+    trip.pop('assist_prev_enabled', None)
+
+def assist_buckets(a, key, start, end, inc):
+    """Split one increment across UTC 15-minute buckets by elapsed time."""
+    span = end - start
+    t = start
+    while True:
+        edge = (math.floor(t / ASSIST_BUCKET_S) + 1) * ASSIST_BUCKET_S
+        part_end = min(edge, end)
+        share = inc if span <= 0 else inc * (part_end - t) / span
+        bucket = a['buckets'].setdefault(str(int(edge - ASSIST_BUCKET_S)), {k: 0.0 for k in ASSIST_CLASSES + ('unknown',)})
+        bucket[key] += share
+        if part_end >= end:
+            return
+        t = part_end
+
+def assist_integrate(trip, now, dt, inc):
+    a = trip.setdefault('assist', assist_new())
+    prev = trip.get('assist_prev')
+    key = prev if prev in ASSIST_CLASSES else 'unknown'
+    a['m'][key] += inc
+    assist_buckets(a, key, now - dt, now, inc)
+    en = trip.get('assist_prev_enabled')
+    a['enabled']['on' if en is True else 'off' if en is False else 'unknown'] += inc
+    if key != 'unknown':
+        a['known_s'] += dt
+    if key in ASSIST_ACTIVE:
+        a['assist_s'] += dt
+        if not a['cur']:
+            a['cur'] = {'start': now - dt, 'm': 0.0, 's': 0.0}
+        a['cur']['m'] += inc
+        a['cur']['s'] += dt
+    else:
+        assist_close(a, now - dt, key == 'unknown')
+    trip['assist_last_at'] = now
+
+def assist_observe(trip, control):
+    """Count transitions only between two consecutive fresh samples."""
+    a = trip.setdefault('assist', assist_new())
+    cls = assist_class(control)
+    prev = trip.get('assist_prev')
+    if prev in ASSIST_CLASSES and cls in ASSIST_CLASSES:
+        if prev == 'manual' and cls in ASSIST_ACTIVE:
+            a['engagements'] += 1
+        elif prev in ASSIST_ACTIVE and cls == 'manual':
+            a['disengagements'] += 1
+    trip['assist_prev'] = cls
+    trip['assist_prev_enabled'] = assist_enabled(control)
+
+def assist_payload(trip, end):
+    a = trip.get('assist')
+    if not a:
+        return None
+    assist_close(a, end, False)
+    r = lambda v: round(v, 1)
+    m = a['m']
+    buckets = [{'at': stamp(int(at)), **{k + 'M': r(v[k]) for k in ASSIST_CLASSES + ('unknown',)}}
+               for at, v in sorted(a['buckets'].items(), key=lambda x: int(x[0]))]
+    return {'version': ASSIST_VERSION, 'basisDistanceM': r(sum(m.values())),
+            **{k + 'M': r(m[k]) for k in ASSIST_CLASSES + ('unknown',)},
+            'knownDurationS': round(a['known_s']), 'assistDurationS': round(a['assist_s']),
+            'enabled': {'onM': r(a['enabled']['on']), 'offM': r(a['enabled']['off']),
+                        'unknownM': r(a['enabled']['unknown'])},
+            'engagements': a['engagements'], 'disengagements': a['disengagements'],
+            'longestStreakM': r(a['longest_m']), 'longestStreakS': round(a['longest_s']),
+            'streakCount': a['streak_count'], 'streaks': a['streaks'], 'buckets': buckets}
+
 class Store:
     def __init__(self,path):
         self.path=str(path)
@@ -81,7 +199,8 @@ class Engine:
             self.s['trip'].pop('last_clock', None)
             self.s['trip']['distance_complete'] = False
             self.s['trip']['energy_complete'] = False
-    def tick(self,now,onroad,gps=None,sampled=None,enabled=None,motion=None,diagnostics=None,monotonic_now=None):
+            assist_gap(self.s['trip'], self.s['trip'].get('last_at', 0))
+    def tick(self,now,onroad,gps=None,sampled=None,enabled=None,motion=None,diagnostics=None,monotonic_now=None,control=None):
         if sampled and sampled.get('battery_wh') in MEB_INVALID_ENERGY_WH:
             sampled=dict(sampled)
             sampled.pop('battery_wh', None)
@@ -105,6 +224,7 @@ class Engine:
                 self.s['trip'].pop('last_motion',None)
                 self.s['trip']['distance_complete']=False
                 self.s['trip']['energy_complete']=False
+                assist_gap(self.s['trip'], now)
         events=[];s=self.s;changed=onroad!=s.get('onroad');old_onroad=s.get('onroad')
         trip=s.get('trip')
         if onroad and not trip:
@@ -157,9 +277,13 @@ class Engine:
             valid_speed = type(speed) in (int,float) and math.isfinite(speed) and 0 <= speed <= 70
             previous_speed = trip.get('last_motion')
             if valid_speed and previous_speed is not None and 0 < dt <= 3:
-                trip['distanceM'] += (previous_speed+speed)*0.5*dt
+                increment = (previous_speed+speed)*0.5*dt
+                trip['distanceM'] += increment
+                assist_integrate(trip, now, dt, increment)
             elif wall_dt > 0 and (previous_speed is None or dt > 3 or not valid_speed):
                 trip['distance_complete']=False
+                assist_gap(trip, now)
+            assist_observe(trip, control)
             trip['last_motion'] = speed if valid_speed else None
             # Fresh, quantized odometer anchors validate/recover recorder outages.
             odo = (sampled or {}).get('odometer_km')
@@ -204,6 +328,9 @@ class Engine:
                 and abs(end-datetime.fromisoformat(end_point['at']).timestamp()) <= 35
                 and datetime.fromisoformat(start_point['at']) < datetime.fromisoformat(end_point['at']))
             payload['tripMeasurements'] = {'start':start_point, 'end':end_point, 'complete':complete}
+            assist = assist_payload(trip, end)
+            if assist:
+                payload['assist'] = assist
 
             if payload['distanceM']>=100:events.append(('/api/trips',payload))
             if trip.get('last_point'):s['parking']=dict(trip['last_point'],measured_at=stamp(end))
