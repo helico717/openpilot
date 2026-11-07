@@ -20,6 +20,7 @@ from openpilot.selfdrive.navd.helpers import Coordinate
 from openpilot.common.constants import CV
 from openpilot.common.gps import get_gps_location_service
 from openpilot.selfdrive.carrot.gps_sources import GPSSources
+from openpilot.selfdrive.carrot.navigation_hud import cluster_limits
 from openpilot.selfdrive.carrot.carrot_navi_control import CarrotNaviControl, parse_carrot_navi_control
 
 nav_type_mapping = {
@@ -98,6 +99,8 @@ class CarrotServ:
     self.active_sdi_count = 0
     self.active_sdi_count_max = 200 # 20 sec
 
+    self.cluster_legacy_road = 0
+    self.cluster_legacy_road_at = float("-inf")
     self.active_kisa_count = 0
     self.external_navigation_active = False
 
@@ -915,6 +918,8 @@ class CarrotServ:
     self.carrot_navi_traffic_active = False
 
   def _clear_carrot_navi_control(self):
+    self.cluster_legacy_road = 0
+    self.cluster_legacy_road_at = float("-inf")
     self.rear_camera_events = []
     self.active_count = 0
     self.active_sdi_count = 0
@@ -1287,6 +1292,8 @@ class CarrotServ:
         if not self.is_metric:
           road_limit_speed *= CV.MPH_TO_KPH
         self.nRoadLimitSpeed = road_limit_speed
+        self.cluster_legacy_road = int(road_limit_speed)
+        self.cluster_legacy_road_at = time.monotonic()
     if "kisawazealert" in data:
       pass
     if "kisawazeendalert" in data:
@@ -1516,6 +1523,9 @@ class CarrotServ:
     msg.valid = True
     msg.carrotMan.activeCarrot = self.active_carrot
     msg.carrotMan.nRoadLimitSpeed = int(self.nRoadLimitSpeed)
+    road_sign, enforcement_sign = cluster_limits(self, time.monotonic())
+    msg.carrotMan.clusterRoadLimitKph = road_sign
+    msg.carrotMan.clusterEnforcementKph = enforcement_sign
     msg.carrotMan.remote = remote_ip
     msg.carrotMan.xSpdType = int(self.xSpdType)
     msg.carrotMan.xSpdLimit = int(self.xSpdLimit)
@@ -1709,6 +1719,7 @@ class CarrotServ:
       self.active_sdi_count = self.active_sdi_count_max
       ### roadLimitSpeed
       nRoadLimitSpeed = int(json.get("nRoadLimitSpeed", 20))
+      cluster_road_valid = nRoadLimitSpeed > 0
       if nRoadLimitSpeed > 0:
         if nRoadLimitSpeed > 200:
           nRoadLimitSpeed = (nRoadLimitSpeed - 20) / 10
@@ -1723,6 +1734,10 @@ class CarrotServ:
           self.nRoadLimitSpeed = nRoadLimitSpeed
       else:
         self.nRoadLimitSpeed_counter = 0
+
+      # Only accepted real road values may become information-only notices.
+      self.cluster_legacy_road = int(nRoadLimitSpeed) if cluster_road_valid and self.nRoadLimitSpeed == nRoadLimitSpeed else 0
+      self.cluster_legacy_road_at = time.monotonic()
 
       ### SDI
       self.nSdiType = _i(json.get("nSdiType"), -1)

@@ -319,12 +319,10 @@ class Controls:
     # (tjddyd0130/opendbc meb-cluster-tmap 검증 표시 체계: 카메라 > 커브 > 교차로)
     if self.is_vw_meb:
       carrot_man = self.sm['carrotMan']
-      # 단속카메라/구간단속 (방지턱 22는 계기판 미표시 - 제한속도 표지로 오인됨)
-      navi_speed_limit = 0
-      # 연결이 끊긴 carrotMan의 마지막 단속 정보로 비활성 ACC 배너를 유지하지 않는다.
-      if (self.sm.alive['carrotMan'] and self.sm.valid['carrotMan'] and carrot_man.activeCarrot >= 2
-          and carrot_man.xSpdType >= 0 and carrot_man.xSpdType != 22 and carrot_man.xSpdLimit > 0):
-        navi_speed_limit = int(carrot_man.xSpdLimit)
+      # Information-only external road/enforcement signs, independent of speed-control selection.
+      navigation_valid = self.sm.alive['carrotMan'] and self.sm.valid['carrotMan']
+      navi_speed_limit = int(carrot_man.clusterEnforcementKph) if navigation_valid else 0
+      hudControl.roadSpeedLimit = int(carrot_man.clusterRoadLimitKph) if navigation_valid else 0
       hudControl.naviSpeedLimit = navi_speed_limit
       # 커브 / 교차로 / 분기·출구 / 로터리 / 병목 / 정체 (실차 스캔으로 확정된 이벤트 지도 기반)
       navi_event_type = 0

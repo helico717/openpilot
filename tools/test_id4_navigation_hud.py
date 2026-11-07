@@ -26,7 +26,7 @@ UTILS = load_source(VW / "mebutils.py", {"CV": CV})
 CAN = load_source(VW / "mebcan.py", {"CV": CV, "VolkswagenFlags": FLAGS,
                                    "map_speed_to_acc_tempolimit": UTILS.map_speed_to_acc_tempolimit})
 ENUM = NS(steerRequired=1, ldw=2, stopping=1, starting=2, pid=3)
-STRUCTS = NS(CarControl=NS(HUDControl=NS(VisualAlert=ENUM), Actuators=NS(LongControlState=ENUM)))
+STRUCTS = NS(CarState=NS(GearShifter=NS(park="park")), CarControl=NS(HUDControl=NS(VisualAlert=ENUM), Actuators=NS(LongControlState=ENUM)))
 CONTROLLER = load_source(VW / "carcontroller.py", {
   "CarControllerBase": object, "structs": STRUCTS, "VolkswagenFlags": FLAGS,
   "CV": CV, "CANBUS": NS(pt=0, cam=2), "DT_CTRL": 0.01,
@@ -39,28 +39,29 @@ class Packer:
 
 
 def controller_frame(enabled=False, available=True, override=False, fault=False,
-                     camera=60, event_type=0, event_speed=0, hold=False, own_long=True):
-  c = CONTROLLER.__new__(CONTROLLER)
+                     camera=60, event_type=0, event_speed=0, hold=False, own_long=True, road=0, controller=None):
+  c = controller or CONTROLLER.__new__(CONTROLLER)
   c.CP = NS(flags=FLAGS.MEB, openpilotLongitudinalControl=own_long, pcmCruise=False)
   c.CCP = NS(STEER_STEP=100, ACC_CONTROL_STEP=100, LDW_STEP=100, ACC_HUD_STEP=6)
   c.CCS = CAN
   c.frame = 6  # HUD frame, skip unrelated steering/acceleration/LDW cycles
   c.packer_pt = Packer()
   c.apply_curvature_last = 0
-  c.navi_event_last = c.navi_banner_frames = c.road_limit_last = c.road_banner_frames = 0
+  if controller is None:
+    c.navi_event_last = c.navi_banner_frames = c.road_limit_last = c.road_banner_frames = 0
   c.lead_limit_disp = False
   c.lead_limit_cnt = 0
   hud = NS(setSpeed=80 / 3.6, leadDistance=0, leadVisible=False, leadDistanceBars=2,
-           naviSpeedLimit=camera, naviEventType=event_type, naviEventSpeed=event_speed, leadLimiting=False)
-  cc = NS(enabled=enabled, hudControl=hud, cruiseControl=NS(override=override),
+           roadSpeedLimit=road, naviSpeedLimit=camera, naviEventType=event_type, naviEventSpeed=event_speed, leadLimiting=False)
+  cc = NS(enabled=enabled, latActive=False, hudControl=hud, cruiseControl=NS(override=override),
           actuators=NS(as_builder=lambda: NS()))
-  cs = NS(out=NS(gasPressed=False, accFaulted=fault, cruiseState=NS(available=available), vEgo=20),
+  cs = NS(out=NS(gasPressed=False, accFaulted=fault, cruiseState=NS(available=available), vEgo=20, gearShifter="drive"),
           esp_hold_confirmation=hold, gra_stock_values={"COUNTER": 0})
   _, messages = c.update(cc, cs, 0)
   return [values for name, _, values in messages if name == "MEB_ACC_01"]
 
 
-def forwarded_camera(alive=True, valid=True, active=2, kind=1, speed=60):
+def forwarded_camera(alive=True, valid=True, active=2, kind=1, speed=60, return_hud=False):
   path = ROOT / "openpilot/selfdrive/controls/controlsd.py"
   tree = ast.parse(path.read_text(encoding="utf-8"))
   cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "Controls")
@@ -74,11 +75,12 @@ def forwarded_camera(alive=True, valid=True, active=2, kind=1, speed=60):
   module = ast.Module(body=block.body[:end + 1], type_ignores=[])
   class SM(dict):
     pass
-  sm = SM(carrotMan=NS(activeCarrot=active, xSpdType=kind, xSpdLimit=speed))
+  sm = SM(carrotMan=NS(activeCarrot=active, xSpdType=kind, xSpdLimit=speed, clusterRoadLimitKph=60,
+                       clusterEnforcementKph=speed if active >= 2 and kind >= 0 and kind != 22 else 0))
   sm.alive, sm.valid = {"carrotMan": alive}, {"carrotMan": valid}
   hud = NS()
   exec(compile(module, str(path), "exec"), {"self": NS(sm=sm), "hudControl": hud})
-  return hud.naviSpeedLimit
+  return hud if return_hud else hud.naviSpeedLimit
 
 
 class TestId4NavigationHud(unittest.TestCase):
@@ -107,7 +109,7 @@ class TestId4NavigationHud(unittest.TestCase):
       with self.subTest(kind=kind):
         v = controller_frame(camera=0, event_type=kind, event_speed=speed)[0]
         self.assertEqual((v["ACC_Events"], v["ACC_Tempolimit"]), (0, 0))
-    self.assertEqual(controller_frame(enabled=True, camera=0, event_type=8, event_speed=60)[0]["ACC_Events"], 5)
+    self.assertEqual(controller_frame(enabled=True, camera=0, event_type=8, event_speed=60, road=60)[0]["ACC_Events"], 5)
     self.assertEqual(controller_frame(enabled=True, camera=0, event_type=1, event_speed=40)[0]["ACC_Events"], 7)
 
   def test_camera_preempts_hold_and_turn(self):

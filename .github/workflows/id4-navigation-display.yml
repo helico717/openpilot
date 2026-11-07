@@ -1,0 +1,30 @@
+name: ID4 navigation display
+on:
+  push:
+    branches: [carrot-wip-model_selector-ha]
+    paths:
+      - 'opendbc_repo/opendbc/car/volkswagen/**'
+      - 'opendbc_repo/opendbc/car/car.capnp'
+      - 'openpilot/cereal/custom.capnp'
+      - 'openpilot/selfdrive/carrot/navigation_hud.py'
+      - 'openpilot/selfdrive/carrot/carrot_serv.py'
+      - 'openpilot/selfdrive/controls/controlsd.py'
+      - 'tools/test_id4_*.py'
+      - '.github/workflows/id4-navigation-display.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  display:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install numpy pycapnp
+      - name: Controller, input classification and parked display probes
+        run: |
+          python tools/test_id4_navigation_hud.py
+          python tools/test_id4_speed_notices.py
+          python tools/test_id4_speed_notices_native.py

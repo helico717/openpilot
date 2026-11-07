@@ -48,6 +48,10 @@ class CarController(CarControllerBase):
     # 도로제한속도: 제한값이 바뀔 때만 "인식됨" 배너 후 km/h 아이콘 유지
     self.road_limit_last = 0
     self.road_banner_frames = 0
+    self.acc_display_probe = None
+    if CP.carFingerprint == CAR.VOLKSWAGEN_ID4_MK1:
+      from opendbc.car.volkswagen.acc_display_probe import AccDisplayProbe
+      self.acc_display_probe = AccDisplayProbe()
     # 앞차 지배 표시 디바운스 (정체 깜빡임 방지)
     self.lead_limit_disp = False
     self.lead_limit_cnt = 0
@@ -328,29 +332,34 @@ class CarController(CarControllerBase):
               self.lead_limit_cnt = 0
           else:
             self.lead_limit_cnt = 0
-          # 도로제한속도 제어 중: 제한값이 "실제로 바뀔 때만" 배너 ~1.2초, 이후 km/h 아이콘.
-          # road_limit_last는 지배자 변동/정차 등으로 잠깐 끊겨도 유지 -> 같은 제한값 배너 재생 방지.
-          if acc_event == 0 and acc_hud_status in (3, 4) and hud_control.naviEventType == 8:
-            road_limit_kph = abs(hud_control.naviEventSpeed)
-            if road_limit_kph != self.road_limit_last:
-              self.road_banner_frames = 20
-            self.road_limit_last = road_limit_kph
-            if self.road_banner_frames > 0 and road_limit_kph > 0:
-              self.road_banner_frames -= 1
-              acc_event = 5  # 표지판 + "인식됨"
+
+        # Track changes even when a camera/turn banner occupies the only event slot.
+        # Count the lifetime in HUD frames; never replay an old hidden road change later.
+        road_limit_kph = hud_control.roadSpeedLimit
+        if road_limit_kph <= 0:
+          self.road_limit_last = 0
+          self.road_banner_frames = 0
+        else:
+          if road_limit_kph != self.road_limit_last:
+            self.road_banner_frames = 40  # 2.4s at the existing HUD cadence
+          self.road_limit_last = road_limit_kph
+          if self.road_banner_frames > 0:
+            self.road_banner_frames -= 1
+            if acc_event == 0 and status_icon == 0 and acc_hud_status in (0, 2, 3, 4):
+              acc_event = 5  # current road sign: "recognized", never camera "ahead"
               speed_limit = road_limit_kph * CV.KPH_TO_MS
-            elif not self.lead_limit_disp:
-              # Lead_Brightness는 단일 필드라 아이콘과 앞차 하이라이트를 동시에 못 씀.
-              # 색 = 현재 속도의 지배자: 앞차가 속도를 제한 중이면 앞차 흰색 우선(디바운스 적용),
-              # 그 외(앞차가 없거나 멀어서 도로제한이 지배)에는 km/h 뱃지 점등.
-              status_icon = 4
-          else:
-            self.road_banner_frames = 0
+          elif (acc_event == 0 and status_icon == 0 and acc_hud_status in (3, 4)
+                and hud_control.naviEventType == 8 and not self.lead_limit_disp):
+            status_icon = 4  # preserve the existing ACTIVE road-control indicator only
 
         can_sends.append(self.CCS.create_acc_hud_control(self.packer_pt, CANBUS.pt, acc_hud_status, set_speed,
                                                          hud_control.leadVisible, hud_control.leadDistanceBars, True,
                                                          CS.esp_hold_confirmation, distance, desired_gap, fcw_alert, acc_event,
-                                                         speed_limit, event_speed_kph, status_icon=status_icon))
+                                                         speed_limit, event_speed_kph, status_icon=status_icon,
+                                                         display_probe=getattr(self, "acc_display_probe", None),
+                                                         probe_parked=(CS.out.gearShifter == structs.CarState.GearShifter.park
+                                                                       and abs(CS.out.vEgo) < 0.1 and not CC.enabled
+                                                                       and not CC.latActive and not CS.out.accFaulted)))
       else:
         # MQB ACC HUD (original carrot path, mqbcan signatures)
         lead_distance = 0

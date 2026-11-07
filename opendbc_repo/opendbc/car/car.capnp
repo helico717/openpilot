@@ -529,12 +529,13 @@ struct CarControl {
     leadRadar @15: Int16;
     modelDesire @16: Int16;
     atcDistance @17: Float32;
-    naviSpeedLimit @18: Int16;  # VW MEB cluster: TMAP 단속카메라/구간단속 제한속도 (kph, 0=없음) -> ACC_Tempolimit + event 5
+    naviSpeedLimit @18: Int16;  # VW MEB cluster: TMAP 단속카메라/구간단속 제한속도 (kph, 0=없음) -> ACC_Tempolimit + event 4
     naviEventType @19: Int16;   # VW MEB cluster: 0=없음 1=커브 2=교차로 3=분기/출구 4=로터리 5=병목 8=도로제한제어중
     naviEventSpeed @20: Int16;  # VW MEB cluster: 목표속도 kph (커브는 부호=방향: +우/-좌) -> ACC_Event_Wunschgeschw
     leadLimiting @21: Bool;     # VW MEB cluster: 앞차가 속도를 제한 중(xState lead) -> 앞차 하이라이트 우선
 
     driverMonitoringAlert @22: UInt8;  # 0=none, 1=initial, 2=audible, 3=terminal; fresh enabled DM only
+    roadSpeedLimit @24: Int16; # VW MEB information-only current road limit, kph; 0=unknown
     physicalBlinkerHold @23: UInt8;  # 0=legacy, 1=release, 2=left hold, 3=right hold; fresh USB-CAN lease
 
     # not used with the dash, TODO: separate structs for dash UI and device UI

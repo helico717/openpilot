@@ -28,7 +28,7 @@ if ! git rev-parse -q --verify MERGE_HEAD >/dev/null; then
 fi
 # A clean textual merge can still change the fork's inactive-ACC navigation HUD.
 # Refuse publication if production HUD logic no longer satisfies the contract.
-if ! python3 tools/test_id4_navigation_hud.py; then
+if ! python3 tools/test_id4_navigation_hud.py || ! python3 tools/test_id4_speed_notices.py; then
   echo "ID.4 navigation HUD regression; refusing to publish the upstream merge."
   git merge --abort
   exit 1

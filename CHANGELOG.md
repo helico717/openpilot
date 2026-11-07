@@ -11,6 +11,28 @@
 
 # Changelog
 
+## 2026-11-07 — Separate ID.4 road recognized and enforcement ahead notices
+
+- Request: valid external road limits should briefly show recognized even with ACC
+  inactive; camera/section warnings should show ahead with their own original limit.
+- Add independent display fields through navigation producer, cereal, controls and
+  HUD. Keep initial/fallback/stale road values out, classify enforcement separately,
+  preserve raw signs without control factors, and expire hidden road changes.
+- Road banner40 HUD frames (~2.4s), no inactive control icon; real ACC status and
+  steering/longitudinal commands unchanged. No Panda/forwarding changes.
+- Optional MK1 parked probe: primary text36/44/45 only, P/near-zero speed/inactive
+  ACC+lateral/fault/event guards,2s expiry, boot binding, matched status, cancellation.
+  No live request sent; software packing is not vehicle rendering confirmation.
+- Files: navigation_hud, carrot_serv, custom/car schemas, controlsd, MEB controller/
+  packer/probe, focused tests, sync regression gate, CI and docs/id4_speed_notices_20261107.md.
+- Validation: local20 tests (6 existing+11 new+3 real schema/DBC), including20 real DBC/state/
+  event combinations and6 exact-bit probe/restore combinations, schema roundtrips,
+  Python syntax and Git whitespace checks pass. Dedicated Linux CI added.
+  Vehicle installation/rendering remains pending.
+- Delivery: Git-only carrot-wip-model_selector-ha publication; user pull/reboot.
+  No device source copying, physical CAN test or reboot by the agent.
+
+
 ## 2026-11-03 — Full 4-bit LDW_Texte experiment range
 
 - User clarified that1..9 was illustrative and explicitly requested all raw values0..15. Added text0..text15 as individual profiles;0 is neutral,4/8 defined warnings, other meanings unverified.
