@@ -89,3 +89,20 @@ restarts HA. No HACS tag/release is authorized by this feature request.
 2026-11-11 follow-up: controller/bus mapping regression added; the actual board
 can_set_orientation implementation confirms flipped0<->2,1 unchanged. Unknown
 harness orientation is rejected. No wiring change is requested.
+
+## Matched no-message control (2026-11-11 follow-up)
+
+CLI action `control` performs the same receive activation, mode35 handshake/CAN
+reinitialization, three1s guarded intervals and0.2s neutral interval, followed by
+identical receive/restore phases. It creates NO sendcan publisher, constructs NO
+request or neutral message and never calls send. This differs from observe-only,
+which does not enter mode35. Result status is matched_control_completed, not lock
+success. Mode35 still technically permits bounded TM01 output; this is an
+application-level no-message control, not silent hardware mode (CAN ACK/error
+behavior and unrelated publishers are not proven absent).
+
+All explicit runs now preserve per-request JSON in runtime history before updating
+last_result.json. HA provides a third dedicated control button. No new firmware
+source change is required; existing trial-mode firmware must already be installed.
+CLI semantic tests6pass, including zero frame-builder/send calls in control and
+preserved request/neutral sequence in command mode. Actual field control untested.

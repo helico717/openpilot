@@ -57,6 +57,19 @@ def require_panda(sm, bus, expected, check_bus=True):
   return p
 
 
+def trial_window(publisher, data, bus, sample, guard, result, control=False):
+  """Same mode35 residence; control never calls send, including neutral."""
+  for _ in range(3):
+    guard()
+    if not control:
+      publisher.send(data(False))
+      result['published_requests'] += 1
+    sample(1, {MODE}, True)
+  if not control:
+    publisher.send(data(True))
+  sample(.2, {MODE}, True)
+
+
 def execute(action, bus, nonce, observe_only=False):
   from openpilot.cereal import car, messaging
   from openpilot.selfdrive.pandad import can_list_to_can_capnp
@@ -72,7 +85,9 @@ def execute(action, bus, nonce, observe_only=False):
             'frames_before_enable': 0, 'frames_receive_only': 0, 'frames_after_request': 0,
             'lock_before': None, 'lock_after': None, 'restored': False}
   phase = 'frames_before_enable'
-  expected_payload = payload(action)
+  control = action == 'control'
+  expected_payload = None if control else payload(action)
+  result['control_only'] = control
 
   def sample(seconds, modes, require_active=False):
     deadline = time.monotonic()+seconds
@@ -126,7 +141,7 @@ def execute(action, bus, nonce, observe_only=False):
       raise RuntimeError('receive_path_not_activated_update_pandad')
     if not observe_only:
       require_panda(sm, bus, {19})
-      publisher = messaging.pub_sock('sendcan')
+      publisher = None if control else messaging.pub_sock('sendcan')
       lease(True, 8)
       # Policy handshake; waiting does not publish CAN.
       deadline = time.monotonic()+1.5
@@ -138,14 +153,12 @@ def execute(action, bus, nonce, observe_only=False):
         if time.monotonic() > deadline:
           raise RuntimeError('trial_policy_handshake_timeout')
       phase = 'frames_after_request'
-      for _ in range(3):
+      def guard():
         sm.update(0)
         require_panda(sm, bus, {MODE})
-        publisher.send(can_list_to_can_capnp([(0x5A7, expected_payload, bus)], 'sendcan'))
-        result['published_requests'] += 1
-        sample(1, {MODE}, True)
-      publisher.send(can_list_to_can_capnp([(0x5A7, bytes(8), bus)], 'sendcan'))
-      sample(.2, {MODE}, True)
+      def data(neutral):
+        return can_list_to_can_capnp([(0x5A7, bytes(8) if neutral else expected_payload, bus)], 'sendcan')
+      trial_window(publisher, data, bus, sample, guard, result, control)
       # Receive feedback while leaving request transmission disabled.
       lease(False, 5)
       sample(2, {MODE, 19})
@@ -170,13 +183,15 @@ def execute(action, bus, nonce, observe_only=False):
         result['restored_to'] = 'normal_vehicle_policy'
         break
     # Additional feedback after restore may arrive, but must not imply CAN TX.
-    if result['published_requests'] and 'error' not in result:
+    if (result['published_requests'] or control) and 'error' not in result:
       try:
         sample(3, {19})
       except Exception as exc:
         result['feedback_error'] = str(exc)[:160]
   if 'error' in result:
     result['status'] = 'blocked'
+  elif control and not observe_only:
+    result['status'] = 'matched_control_completed'
   elif observe_only:
     result['status'] = 'receive_only_completed'
   elif result['lock_after'] is (action == 'lock'):
@@ -192,7 +207,7 @@ def execute(action, bus, nonce, observe_only=False):
 
 def main():
   p = argparse.ArgumentParser(description=__doc__)
-  p.add_argument('--action', choices=('lock', 'unlock'), required=True)
+  p.add_argument('--action', choices=('lock', 'unlock', 'control'), required=True)
   p.add_argument('--bus', type=int, choices=(0, 1, 2), default=0)
   p.add_argument('--request-id', required=True)
   p.add_argument('--observe-only', action='store_true')
@@ -210,7 +225,11 @@ def main():
       except Exception as exc:
         result = {'status': 'blocked', 'error': str(exc)[:160]}
       result['request_id'] = args.request_id
-      (ROOT/'last_result.json').write_text(json.dumps(result))
+      encoded = json.dumps(result)
+      history = ROOT/'history'
+      history.mkdir(exist_ok=True)
+      (history/(args.request_id+'.json')).write_text(encoded)
+      (ROOT/'last_result.json').write_text(encoded)
   print('TM01_RESULT '+args.request_id+' '+json.dumps(result), flush=True)
 
 

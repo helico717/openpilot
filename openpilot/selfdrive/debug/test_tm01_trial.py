@@ -17,6 +17,20 @@ class Sm:
   def __getitem__(self,key):return [self.p] if key=='pandaStates' else NS(gearShifter='park',vEgo=0.)
 
 class Tests(unittest.TestCase):
+  def test_matched_control_has_identical_timing_but_no_publisher_or_neutral(self):
+    times=[];guards=[];r={'published_requests':0}
+    def forbidden(_):raise AssertionError('control built a frame')
+    m.trial_window(None,forbidden,0,lambda *args:times.append(args),lambda:guards.append(1),r,True)
+    self.assertEqual([x[0] for x in times],[1,1,1,.2])
+    self.assertEqual(len(guards),3)
+    self.assertEqual(r['published_requests'],0)
+
+  def test_request_window_retains_three_requests_and_one_neutral(self):
+    sent=[];r={'published_requests':0}
+    m.trial_window(NS(send=sent.append),lambda neutral:neutral,0,lambda *a:None,lambda:None,r)
+    self.assertEqual(sent,[False,False,False,True])
+    self.assertEqual(r['published_requests'],3)
+
   def test_payload_is_exclusively_request_with_init_signature(self):
     self.assertEqual(int.from_bytes(m.payload('lock'),'little'),1<<49)
     self.assertEqual(int.from_bytes(m.payload('unlock'),'little'),1<<50)
