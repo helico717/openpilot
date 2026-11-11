@@ -91,6 +91,7 @@ void set_safety_mode(uint16_t mode, uint16_t param) {
     EXIT_CRITICAL();
   }
   #endif
+  const bool leaving_tm01 = current_safety_mode == SAFETY_MEB_TM01_TRIAL;
   uint16_t mode_copy = mode;
   int err = set_safety_hooks(mode_copy, param);
   if (err == -1) {
@@ -100,6 +101,11 @@ void set_safety_mode(uint16_t mode, uint16_t param) {
     // TERMINAL ERROR: we can't continue if SILENT safety mode isn't succesfully set
     assert_fatal(err == 0, "Error: Failed setting SILENT mode. Hanging\n");
     preserve_can = false;
+  }
+  if ((mode_copy == SAFETY_MEB_TM01_TRIAL) || leaving_tm01) {
+    ENTER_CRITICAL();
+    for (uint8_t i = 0U; i < PANDA_CAN_CNT; i++) { can_clear(can_queues[i]); }
+    EXIT_CRITICAL();
   }
   safety_tx_blocked = 0;
   safety_rx_invalid = 0;
@@ -112,6 +118,7 @@ void set_safety_mode(uint16_t mode, uint16_t param) {
       }
       can_silent = ALL_CAN_SILENT;
       break;
+    case SAFETY_MEB_TM01_TRIAL:  // retain closed stock relay / normal routing
     case SAFETY_NOOUTPUT:
       set_intercept_relay(false, false);
       if (current_board->harness_config->has_harness) {

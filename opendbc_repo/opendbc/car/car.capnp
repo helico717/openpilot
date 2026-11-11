@@ -802,6 +802,7 @@ struct CarParams {
     fcaGiorgio @32;
     rivian @33;
     volkswagenMeb @34;
+    volkswagenMebTm01Trial @35;  # explicit parked experiment, no forwarding
   }
 
   enum SteerControlType {
