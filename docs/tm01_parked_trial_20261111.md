@@ -62,7 +62,7 @@ unsupported firmware feature or missing vehicle wake. It does not prove impossib
 
 ## Verification and installation
 
-Local actual safety-hook/native lease checks5pass; CLI semantic/guard checks3pass;
+Local actual safety-hook/native lease checks5pass; CLI semantic/guard checks4pass;
 companion HA backend3pass + actual local WebSocket2pass + existing terminal5pass.
 Actual H7 and F4 firmware compilation/link/signing passed with Arm GNU14.2.rel1
 (macOS arm64 host; official SHA256 checked). Updated cereal C++ generation and
@@ -72,7 +72,10 @@ run is returned for the pushed SHA, so full Linux CI remains unverified. User
 installation/build and physical TX/wake/lock/unlock have not occurred.
 
 A fresh read-only probe during preparation again showed sleeping/noOutput/power
-save and zero received frames, with CAN0 errorWarning/errorPassive still reported.
+save and zero received frames. canState0 (controller0) reported error flags,
+but this flipped harness maps logical bus0 to controller2, whose reported flags
+were clear. The runner maps controller health by harness orientation; it does not
+use the logical bus number directly as a controller index.
 Receive activation is allowed to diagnose this; TX remains blocked if the selected
 bus still reports an active error afterward. The button must not conceal this or
 report request publication as a successful lock. Git pull/reboot is still required
@@ -82,3 +85,7 @@ User-only installation: `cd /data/openpilot && git pull --ff-only && sudo reboot
 This update changes Panda firmware sources; normal Git startup may rebuild/flash
 its matching firmware. HA code is separately backed up/directly deployed, user
 restarts HA. No HACS tag/release is authorized by this feature request.
+
+2026-11-11 follow-up: controller/bus mapping regression added; the actual board
+can_set_orientation implementation confirms flipped0<->2,1 unchanged. Unknown
+harness orientation is rejected. No wiring change is requested.

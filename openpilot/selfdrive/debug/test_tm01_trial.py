@@ -12,7 +12,7 @@ class Sm:
   valid={'pandaStates':True};recv_time={'pandaStates':100.};updated={'carState':False}
   def __init__(self):
     h=NS(busOff=False,errorWarning=False,errorPassive=False)
-    self.p=NS(pandaType='cuatro',ignitionLine=False,ignitionCan=False,controlsAllowed=False,
+    self.p=NS(pandaType='cuatro',harnessStatus='normal',ignitionLine=False,ignitionCan=False,controlsAllowed=False,
               faults=[],heartbeatLost=False,safetyModel=NS(raw=19),canState0=h)
   def __getitem__(self,key):return [self.p] if key=='pandaStates' else NS(gearShifter='park',vEgo=0.)
 
@@ -26,6 +26,17 @@ class Tests(unittest.TestCase):
     self.assertIsNone(m.lock_observation(bytes(7)))
     self.assertIs(m.lock_observation(((1<<54)|(1<<17)).to_bytes(8,'little')),True)
     self.assertIs(m.lock_observation(((1<<54)|(1<<19)).to_bytes(8,'little')),False)
+  def test_flipped_harness_uses_controller_health_not_logical_bus_index(self):
+    sm=Sm();sm.p.harnessStatus='flipped'
+    sm.p.canState0.errorPassive=True
+    sm.p.canState2=NS(busOff=False,errorWarning=False,errorPassive=False)
+    with patch.object(m.time,'monotonic',return_value=100.5),patch.object(m.Path,'read_text',return_value='0'):
+      self.assertIs(m.require_panda(sm,0,{19}),sm.p)
+      sm.p.canState2.errorPassive=True
+      with self.assertRaises(RuntimeError):m.require_panda(sm,0,{19})
+      sm.p.harnessStatus='notConnected'
+      with self.assertRaises(RuntimeError):m.require_panda(sm,0,{19},check_bus=False)
+
   def test_guards_fail_before_transmit_and_receive_phase_allows_error_diagnosis(self):
     sm=Sm()
     with patch.object(m.time,'monotonic',return_value=100.5),patch.object(m.Path,'read_text',return_value='0'):

@@ -40,7 +40,12 @@ def require_panda(sm, bus, expected, check_bus=True):
     raise RuntimeError('parked_panda_guard_failed')
   if model_number(p) not in expected:
     raise RuntimeError('unexpected_safety_mode_or_firmware_not_installed')
-  h = getattr(p, 'canState'+str(bus))
+  orientation = str(p.harnessStatus)
+  if orientation not in ('normal', 'flipped'):
+    raise RuntimeError('harness_orientation_unconfirmed')
+  # CAN health is indexed by controller; packet src is the logical bus.
+  health_index = 2-bus if orientation == 'flipped' and bus in (0, 2) else bus
+  h = getattr(p, 'canState'+str(health_index))
   if check_bus and (h.busOff or h.errorWarning or h.errorPassive):
     raise RuntimeError('selected_can_bus_error')
   if Path('/data/params/d/IsOnroad').read_text() != '0':
