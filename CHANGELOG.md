@@ -1,3 +1,9 @@
+## 2026-11-14 — Retire TM_01 parked lock experiment
+
+- Owner ended research and requested rollback preparation. Removed trial CLI/tests/CI, pandad lease handling and safety mode35/Classic-CAN/queue exceptions. Five modified runtime sources restored byte-for-byte to2f71f8b0d; all other pre-existing work retained.
+- Technical report retained and marked historical. No runtime result files or evidence deleted. Validation and publication status recorded in companion carrot-ha CHANGELOG and rollback report.
+- Git-only user update/reboot applies matching firmware through normal startup. No Comma access, source copy, CAN TX, firmware flash or reboot performed by the agent.
+
 ## 2026-11-04 — Charging record quality CI passed
 
 - Published code27e02e26baa3c905f6de484fa501912ab2404639 on carrot-wip-model_selector-ha. Dedicated Linux charging-record CI41765211369 completed success: https://github.com/helico717/openpilot/actions/runs/41765211369 . Remote SHA matched before recording this result.

@@ -1,5 +1,13 @@
 # ID.4 TM_01 parked experiment — 2026-11-11
 
+> RETIRED — 2026-11-14: owner ended the research. The trial CLI, lease reader,
+> safety mode35 and firmware exceptions have been removed. Commands below are
+> historical and no longer executable. Research/results remain preserved.
+> Source rollback is prepared in Git; only a user Git update/full reboot applies
+> the matching Panda firmware. No device update, flash or reboot was performed.
+> Runtime sources changed by the experiment match pre-trial2f71f8b0d exactly.
+> A firmware write failure can still require on-site Panda recovery.
+
 Owner explicitly requests lock/unlock trial preparation for an already powered Comma
 with sleeping vehicle CAN. HA exposes separate test buttons; no trial runs at install,
 startup, reconnect or integration reload. This is an experimental signature-Init=0

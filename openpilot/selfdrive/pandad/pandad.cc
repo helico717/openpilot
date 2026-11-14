@@ -20,7 +20,6 @@
 #include "common/timing.h"
 #include "common/util.h"
 #include "selfdrive/pandad/spi_alert.h"
-#include "selfdrive/pandad/tm01_trial.h"
 #include "system/hardware/hw.h"
 
 #define MAX_IR_PANDA_VAL 50
@@ -337,38 +336,23 @@ std::optional<bool> send_panda_states(PubMaster *pm, const std::vector<Panda *> 
     panda_states.push_back(health);
   }
 
-  const auto trial_lease = tm01_trial::read(nanos_since_boot() / 1e9);
-  static std::string trial_nonce;
   for (uint32_t i = 0; i < pandas_cnt; i++) {
     Panda *panda = pandas[i];
     const health_t &health = panda_states[i];
-    const bool trial = trial_lease.valid && pandas_cnt == 1 && !is_onroad && !ignition_local &&
-                       health.faults_pkt == 0 && health.controls_allowed_pkt == 0 &&
-                       (health.safety_mode_pkt == 19 || health.safety_mode_pkt == tm01_trial::MODE);
-    if (trial && trial_lease.transmit) {
-      if (health.safety_mode_pkt != tm01_trial::MODE || trial_nonce != trial_lease.nonce) {
-        panda->set_safety_model(static_cast<cereal::CarParams::SafetyModel>(tm01_trial::MODE), trial_lease.bus);
-        trial_nonce = trial_lease.nonce;
-      }
-    } else if (health.safety_mode_pkt == tm01_trial::MODE) {
-      panda->set_safety_model(cereal::CarParams::SafetyModel::NO_OUTPUT);
-      trial_nonce.clear();
-    }
-
 
     // Make sure CAN buses are live: safety_setter_thread does not work if Panda CAN are silent and there is only one other CAN node
     if (health.safety_mode_pkt == (uint8_t)(cereal::CarParams::SafetyModel::SILENT)) {
       panda->set_safety_model(cereal::CarParams::SafetyModel::NO_OUTPUT);
     }
 
-    bool power_save_desired = !ignition_local && !trial;
+    bool power_save_desired = !ignition_local;
     if (health.power_save_enabled_pkt != power_save_desired) {
       panda->set_power_saving(power_save_desired);
     }
 
     // Set safety mode to NO_OUTPUT when the car is off or we're not onroad.
     bool should_close_relay = !ignition_local || !is_onroad;
-    if (should_close_relay && !trial && (health.safety_mode_pkt != (uint8_t)(cereal::CarParams::SafetyModel::NO_OUTPUT))) {
+    if (should_close_relay && (health.safety_mode_pkt != (uint8_t)(cereal::CarParams::SafetyModel::NO_OUTPUT))) {
       panda->set_safety_model(cereal::CarParams::SafetyModel::NO_OUTPUT);
     }
 
