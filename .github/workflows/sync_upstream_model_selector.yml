@@ -2,8 +2,8 @@ name: Auto Sync Upstream Model Selector
 
 on:
   schedule:
-    # Run every 6 hours
-    - cron: '0 */6 * * *'
+    # Run every 6 hours (off-hour minute to avoid top-of-hour queue drops)
+    - cron: '17 */6 * * *'
   workflow_dispatch:
 
 permissions:
