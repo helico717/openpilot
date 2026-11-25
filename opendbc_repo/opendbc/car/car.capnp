@@ -563,12 +563,12 @@ struct CarControl {
     driverMonitoringAlert @22: UInt8;  # 0=none, 1=initial, 2=audible, 3=terminal; fresh enabled DM only
     roadSpeedLimit @24: Int16; # VW MEB information-only current road limit, kph; 0=unknown
     physicalBlinkerHold @23: UInt8;  # 0=legacy, 1=release, 2=left hold, 3=right hold; fresh USB-CAN lease
-    signalStopObject @24 :Bool; # request only; final SCC interlocks own application
     # joongyu01: @24..@27 until carrot-wip took @24 (2026-11-09)
     trafficState @25: Int16;  # longitudinalPlan.trafficState: 0=off, 1=red, 2=green
     latHudState @26: UInt8;  # 0=lat off, 1=laneless, 2=lane mode, 3=angle error > 3 deg for 0.3 s, 4=saturated
     desiredDistance @27: Float32;  # longitudinalPlan.desiredDistance (m): the gap openpilot keeps, cluster target ring
     alertType @28: Text;  # selfdriveState.alertType ("eventName/eventType"): cluster text popups
+    signalStopObject @29 :Bool; # request only; final SCC interlocks own application
 
     # not used with the dash, TODO: separate structs for dash UI and device UI
     audibleAlert @5: AudibleAlert;
